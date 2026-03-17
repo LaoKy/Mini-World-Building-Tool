@@ -28,10 +28,12 @@ Bạn có thể truy cập và sử dụng công cụ ngay tại đây:
 
 ## Ảnh chụp màn hình
 *(Bạn có thể thêm ảnh chụp màn hình vào đây)*
-![Giao diện công cụ](https://via.placeholder.com/800x400.png?text=Mini+World+Building+Tool+Preview)
+![Giao diện công cụ][defhttps://ibb.co/zV8PxhSt]
 
-## Tác giả
+## 👤 Tác giả
 * **LaoKy** - [Hồ sơ GitHub](https://github.com/laoky)
 
 ---
 *Cảm ơn bạn đã sử dụng công cụ! Nếu thấy hay, đừng quên để lại 1 ⭐ cho Repository này nhé.*
+
+[def]: https://ibb.co/zV8PxhSt
