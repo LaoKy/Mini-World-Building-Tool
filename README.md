@@ -12,7 +12,7 @@ Bạn có thể truy cập và sử dụng công cụ ngay tại đây:
 * **Giao diện trực quan:** Dễ dàng sử dụng trên cả PC và điện thoại.
 * **Tính toán nhanh:** Hỗ trợ các công thức tính toán vật liệu xây dựng.
 * **Tương thích:** Chạy mượt mà trên mọi trình duyệt hiện đại.
-* **Tương thích:** Nó sẽ biên dịch các tệp như .schem/.schematic/.litematic/.mcstructure/.nbt sang lua script trong Mini World
+* **Chức năng:** Nó sẽ biên dịch các tệp như .schem/.schematic/.litematic/.mcstructure/.nbt sang lua script trong Mini World
 
 ## Hướng dẫn sử dụng
 1. Truy cập vào đường dẫn demo phía trên.
