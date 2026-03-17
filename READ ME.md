@@ -27,9 +27,9 @@ Bạn có thể truy cập và sử dụng công cụ ngay tại đây:
 ---
 
 ## Ảnh chụp màn hình
-*(Bạn có thể thêm ảnh chụp màn hình vào đây)*
-![Giao diện công cụ][image1]
-![Thành quả][image3][image2]
+![Giao diện công cụ][image1.png]
+![Trước khi chuyển đổi][image3.png]
+![Sau khi chuyển đổi][image2.png]
 
 ## Tác giả
 * **LaoKy** - [Hồ sơ GitHub](https://github.com/laoky)
