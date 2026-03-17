@@ -88,7 +88,7 @@
     <div class="container">
         <input type="file" id="file-upload" accept=".schem,.schematic,.schm,.litematic,.mcstructure,.nbt">
         <br>
-        <button id="convert-btn" py-click="process_file">CHUYỂN ĐỔI NGAY</button>
+        <button id="convert-btn" py-click="process_file">Convert to lua</button>
         <div id="loading-msg">Đang khởi tạo môi trường Python (lần đầu tải có thể mất vài giây)...</div>
         
         <textarea id="log-output" readonly placeholder="Log hệ thống sẽ hiển thị ở đây..."></textarea>
@@ -124,7 +124,7 @@ sys.stdout = WebConsole()
 sys.stderr = WebConsole()
 
 # Xóa dòng loading khi Python đã sẵn sàng
-document.getElementById("loading-msg").innerText = "Hệ thống sẵn sàng!"
+document.getElementById("loading-msg").innerText = "The system is ready!"
 document.getElementById("loading-msg").style.color = "#00ff88"
 
 # =========================================================================
@@ -1614,6 +1614,52 @@ def parse_schematic(file_path: str) -> tuple[list[BlockEntry], dict]:
         192: "minecraft:acacia_fence",   193: "minecraft:spruce_door",
         194: "minecraft:birch_door",     195: "minecraft:jungle_door",
         196: "minecraft:acacia_door",    197: "minecraft:dark_oak_door",
+            # ── Bổ sung các block còn thiếu từ log lỗi (bản cập nhật 3) ───────────────
+    # Stairs & Walls từ đá có rêu
+    "minecraft:mossy_cobblestone_stairs":   530, # 530_Redbrickstair - cầu thang đá rêu
+    "minecraft:mossy_cobblestone_slab":     510, # 510_Redbrickstep - phiến đá rêu
+    "minecraft:mossy_cobblestone_wall":     503, # 503_MossyStoneBrick - tường đá rêu
+    "minecraft:cobblestone_wall":           502, # 502_stonebrick_cracked - tường đá cuội
+    
+    # Hoa cánh hồng (Pink Petals)
+    "minecraft:pink_petals":                 313, # 313_rose - hoa hồng (màu hồng)
+    
+    # Dây bẫy (Tripwire)
+    "minecraft:tripwire":                    232, # 232_vine - dây leo (dùng làm dây bẫy)
+    
+    # Thang (Ladder) - mặc dù đã có trong block map nhưng log báo thiếu
+    "minecraft:ladder":                      813, # 813_Ladder
+    
+    # Đèn đồng (Copper Bulb) - các biến thể
+    "minecraft:copper_bulb":                 861, # 861_glowstone_lamp_wood - đèn đá đỏ
+    "minecraft:exposed_copper_bulb":         861,
+    "minecraft:weathered_copper_bulb":       861,
+    "minecraft:oxidized_copper_bulb":        861,
+    "minecraft:waxed_copper_bulb":           861,
+    "minecraft:waxed_exposed_copper_bulb":   861,
+    "minecraft:waxed_weathered_copper_bulb": 861,
+    "minecraft:waxed_oxidized_copper_bulb":  861,
+    
+    # Banner treo tường (Wall Banners)
+    "minecraft:white_wall_banner":           925, # 925_flag0 - cờ trắng
+    "minecraft:orange_wall_banner":          919, # 919_flag1 - cờ cam
+    "minecraft:magenta_wall_banner":         920, # 920_flag2 - cờ đỏ tía
+    "minecraft:light_blue_wall_banner":      921, # 921_flag3 - cờ xanh nhạt
+    "minecraft:yellow_wall_banner":          922, # 922_flag4 - cờ vàng
+    "minecraft:lime_wall_banner":            923, # 923_flag5 - cờ xanh vôi
+    "minecraft:pink_wall_banner":            924, # 924_flag6 - cờ hồng
+    "minecraft:gray_wall_banner":            925, # 925_flag0 (dùng lại)
+    "minecraft:light_gray_wall_banner":      925,
+    "minecraft:cyan_wall_banner":            919,
+    "minecraft:purple_wall_banner":          920,
+    "minecraft:blue_wall_banner":            921,
+    "minecraft:brown_wall_banner":           922,
+    "minecraft:green_wall_banner":           923,
+    "minecraft:red_wall_banner":             924,
+    "minecraft:black_wall_banner":           925,
+    
+    # Mầm tre (Bamboo Sapling)
+    "minecraft:bamboo_sapling":              253, # 253_bamboo_shoot - măng tre
     }
 
     blocks = []
