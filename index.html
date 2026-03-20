@@ -9,7 +9,6 @@
     <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
     
     <style>
-        /* Giao diện Dark Mode lấy cảm hứng từ Tkinter GUI của bạn */
         body { 
             font-family: 'Consolas', monospace; 
             background-color: #1a1a2e; 
@@ -123,41 +122,12 @@ class WebConsole:
 sys.stdout = WebConsole()
 sys.stderr = WebConsole()
 
-# Xóa dòng loading khi Python đã sẵn sàng
-document.getElementById("loading-msg").innerText = "The system is ready!"
-document.getElementById("loading-msg").style.color = "#00ff88"
-
-# =========================================================================
-# ⬇️⬇️ CẮT DÁN TOÀN BỘ CODE PYTHON TỪ TỆP MAIN.PY CỦA BẠN VÀO ĐÂY ⬇️⬇️
-# Bắt đầu từ đoạn định nghĩa: BLOCK_MAP = { ... }
-# Kéo dài đến hết các hàm parser (parse_schem, parse_mcstructure, v.v...)
-# Bao gồm cả hàm generate_lua_script và run_conversion
-# Không cần copy khối thư viện (import tkinter...) và khối if __name__ == "__main__":
-# =========================================================================
-
-# (Dán code vào vị trí này)
-"""
-╔══════════════════════════════════════════════════════════════════════════════╗
-║  .mcstructure/.nbt/.schem/.schematic/.litematic → Mini World Lua Converter   ║
-║                          Version 3.0 Professional                            ║
-╚══════════════════════════════════════════════════════════════════════════════╝
-
-Tính năng:
-  - Hỗ trợ .schem (SpongeSchematic v1/v2/v3), .schematic (MCEdit), .litematic
-  - Deep Scan đệ quy để tìm các thẻ NBT không phụ thuộc cấu trúc lồng ghép
-  - Phân tích Properties hướng (facing, axis, half, ...) → direction Mini World
-  - BLOCK_MAP trực tiếp: "minecraft:grass_block" → ID Mini World (dễ chỉnh sửa)
-  - Xuất Lua script chia thành 3 bảng + hàm /build với Block:setBlockAll
-  - Xử lý lỗi chi tiết, không dừng chương trình khi gặp lỗi cục bộ
-"""
-
 import os
 import sys
 import re
 import traceback
 from pathlib import Path
 
-# ─── Kiểm tra & import thư viện ────────────────────────────────────────────────
 try:
     import nbtlib
 except ImportError:
@@ -1253,34 +1223,23 @@ DEFAULT_ID = None
 
 
 def minecraft_name_to_miniworld_id(mc_name: str) -> int | None:
-    """
-    Chuyển đổi tên block Minecraft (có hoặc không có namespace)
-    sang ID Mini World. Trả về None nếu là block rỗng (air).
-    """
+
     name = mc_name.strip().lower()
 
-    # Chuẩn hoá namespace
     if ':' not in name:
         name = "minecraft:" + name
 
-    # Tra cứu trực tiếp
     if name in BLOCK_MAP:
         return BLOCK_MAP[name]
 
-    # Fallback: bỏ namespace rồi tìm lại
     bare = name.split(':', 1)[1]
     full_fallback = "minecraft:" + bare
     if full_fallback in BLOCK_MAP:
         return BLOCK_MAP[full_fallback]
 
-    # Không tìm thấy → dùng mặc định
     print(f"  [MAP?] Không tìm thấy: {name} → dùng id mặc định {DEFAULT_ID}")
     return DEFAULT_ID
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  2. LOGIC HƯỚNG (DIRECTION)
-# ══════════════════════════════════════════════════════════════════════════════
 
 FACING_TO_DIRECTION = {
     "north": 3,
@@ -1291,7 +1250,6 @@ FACING_TO_DIRECTION = {
     "up": 5,   # Hướng lên
 }
 
-# SỬA LỖI Ở ĐÂY: Trục Y (trên/xuống) của Mini World thường có data là 0
 AXIS_TO_DIRECTION = {
     "x": 1, # Nằm ngang trục X
     "y": 0, # Hướng đứng (trên/xuống) 
@@ -1299,10 +1257,7 @@ AXIS_TO_DIRECTION = {
 }
 
 def parse_block_state(block_state_str: str) -> tuple[str, dict]:
-    """
-    Phân tích chuỗi block state:
-    "minecraft:oak_stairs[facing=north,half=bottom]" → ("minecraft:oak_stairs", {"facing":"north",...})
-    """
+
     match = re.match(r'^([^\[]+)(?:\[([^\]]*)\])?$', block_state_str.strip())
     if not match:
         return block_state_str.strip(), {}
@@ -1319,18 +1274,14 @@ def parse_block_state(block_state_str: str) -> tuple[str, dict]:
 
 
 def get_direction(props: dict) -> int:
-    """Chuyển đổi properties Minecraft → direction Mini World."""
     dir_val = 0
     
-    # 1. Xử lý block có hướng mặt (facing)
     if "facing" in props:
         dir_val = FACING_TO_DIRECTION.get(props["facing"].lower(), 0)
     
-    # 2. Xử lý block dạng cột/trục (axis) như thân gỗ, cột thạch anh
     elif "axis" in props:
         return AXIS_TO_DIRECTION.get(props["axis"].lower(), 0)
         
-    # 3. SỬA LỖI Ở ĐÂY: Xử lý cầu thang/phiến đá lật ngược (nửa trên)
     # Trong Mini World, các block lật ngược thường cộng thêm 4 (hoặc 8 tùy block) vào data
     if "half" in props and props["half"] == "top":
         dir_val += 4
@@ -1339,36 +1290,22 @@ def get_direction(props: dict) -> int:
         
     return dir_val
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  3. MINECRAFT LEGACY DATA VALUE → DIRECTION (cho .schematic cũ)
-# ══════════════════════════════════════════════════════════════════════════════
-
 def legacy_data_to_direction(block_id: int, data_value: int) -> int:
-    """Chuyển đổi metadata Minecraft (.schematic cũ) → direction Mini World."""
-    # Logs (block_id 17): bits 2-3 là trục
     if block_id == 17:
         axis = (data_value >> 2) & 0x3
         return [1, 5, 3, 0][axis % 4]
-    # Stairs
     STAIR_IDS = {53,67,108,109,114,128,134,135,136,163,164,180,203}
     if block_id in STAIR_IDS:
         return {0: 5, 1: 4, 2: 3, 3: 2}.get(data_value & 0x3, 0)
-    # Doors
     DOOR_IDS = {64, 71, 193, 194, 195, 196, 197}
     if block_id in DOOR_IDS:
         return {0: 3, 1: 4, 2: 2, 3: 5}.get(data_value & 0x3, 0)
-    # Furnace, Dispenser
     if block_id in {23, 61, 62, 158}:
         return {2: 3, 3: 2, 4: 4, 5: 5}.get(data_value & 0x7, 0)
     return 0
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  4. ĐỌC FILE NBT – DEEP SCAN ĐỆ QUY
-# ══════════════════════════════════════════════════════════════════════════════
-
 def deep_scan(nbt_data, target_key: str):
-    """Tìm kiếm đệ quy trong cây NBT. Trả về giá trị đầu tiên tìm thấy."""
     if isinstance(nbt_data, (dict, nbtlib.Compound)):
         for key, value in nbt_data.items():
             if key == target_key:
@@ -1385,7 +1322,6 @@ def deep_scan(nbt_data, target_key: str):
 
 
 def decode_varint_array(data: bytes) -> list[int]:
-    """Giải mã mảng VarInt từ bytes (SpongeSchematic v2/v3)."""
     result = []
     i = 0
     while i < len(data):
@@ -1408,12 +1344,8 @@ def decode_varint_array(data: bytes) -> list[int]:
     return result
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  5. PARSER CHO TỪNG ĐỊNH DẠNG FILE
-# ══════════════════════════════════════════════════════════════════════════════
-
 class BlockEntry:
-    """Đại diện cho một khối trong công trình."""
+
     __slots__ = ('x', 'y', 'z', 'miniworld_id', 'direction')
 
     def __init__(self, x: int, y: int, z: int, miniworld_id: int, direction: int = 0):
@@ -1441,10 +1373,7 @@ def _dump_nbt_keys(nbt_data, prefix="", depth=0, max_depth=4):
 
 
 def _extract_palette_and_data(nbt_file):
-    """
-    Trích xuất Palette và BlockData từ file SpongeSchematic (v1/v2/v3).
-    Trả về (palette_tag, block_data_tag, width, height, length)
-    """
+
     w = deep_scan(nbt_file, "Width")
     h = deep_scan(nbt_file, "Height")
     l = deep_scan(nbt_file, "Length")
@@ -1596,7 +1525,6 @@ def parse_schematic(file_path: str) -> tuple[list[BlockEntry], dict]:
     block_ids = list(blocks_tag)
     data_vals = list(data_tag) if data_tag is not None else [0] * len(block_ids)
 
-    # Ánh xạ ID số Minecraft cũ → tên block có namespace
     LEGACY_ID_MAP = {
         0: None,
         1: "minecraft:stone",            2: "minecraft:grass_block",
@@ -1921,29 +1849,23 @@ def parse_mcstructure(file_path: str) -> tuple[list[BlockEntry], dict]:
         base_name = str(block_item.get("name", "minecraft:air"))
         states = block_item.get("states", {})
         props = {}
-
-        # ─── BẮT ĐẦU FIX HƯỚNG BEDROCK SANG JAVA ───
         
-        # 1. Cầu thang (Stairs) trong Bedrock dùng "weirdo_direction"
         if "weirdo_direction" in states:
             bedrock_weirdo = int(states["weirdo_direction"])
             # 0: East, 1: West, 2: South, 3: North
             weirdo_map = {0: "east", 1: "west", 2: "south", 3: "north"}
             props["facing"] = weirdo_map.get(bedrock_weirdo, "east")
             
-        # 2. Block có hướng nói chung (Lò nung, Rương, Máy phân phát...)
         elif "facing_direction" in states:
             bedrock_facing = int(states["facing_direction"])
             facing_map = {0: "down", 1: "up", 2: "north", 3: "south", 4: "west", 5: "east"}
             props["facing"] = facing_map.get(bedrock_facing, "north")
             
-        # 3. Cửa, Giường, Cửa sập (Doors, Trapdoors, Beds...)
         elif "direction" in states:
             bedrock_dir = int(states["direction"])
             dir_map = {0: "south", 1: "west", 2: "north", 3: "east"}
             props["facing"] = dir_map.get(bedrock_dir, "south")
             
-        # 4. Đuốc (Torches)
         elif "torch_facing_direction" in states:
             t_facing = str(states["torch_facing_direction"])
             if t_facing == "top":
@@ -1951,19 +1873,14 @@ def parse_mcstructure(file_path: str) -> tuple[list[BlockEntry], dict]:
             elif t_facing != "unknown":
                 props["facing"] = t_facing
 
-        # 5. Gỗ, Cột thạch anh (Pillars / Logs)
         if "pillar_axis" in states:
             props["axis"] = str(states["pillar_axis"]).lower()
             
-        # 6. Cầu thang úp ngược, Cửa sập mở, Phiến đá nửa trên
         if "upside_down_bit" in states and states["upside_down_bit"]:
             props["half"] = "top"
         if "top_slot_bit" in states and states["top_slot_bit"]:
             props["type"] = "top"
 
-        # ─── KẾT THÚC FIX HƯỚNG ───
-
-        # Tái sử dụng hàm chuyển đổi ID và tính Direction Mini World
         mid = minecraft_name_to_miniworld_id(base_name)
         direction = get_direction(props)
         palette_lookup[idx] = (mid, direction)
@@ -2066,9 +1983,6 @@ def parse_structure_nbt(file_path: str) -> tuple[list[BlockEntry], dict]:
     print(f"[OK] Đã đọc {len(blocks)} khối từ structure .nbt")
     return blocks, meta
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  6. SINH LUA SCRIPT
-# ══════════════════════════════════════════════════════════════════════════════
 
 def generate_lua_script(blocks: list[BlockEntry], meta: dict, output_path: str):
     """
@@ -2160,11 +2074,6 @@ end)
     print(f"[OK] Da luu Lua script: {output_path}")
     print(f"     Kich thuoc file: {os.path.getsize(output_path) / 1024:.1f} KB")
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  7. GIAO DIỆN NGƯỜI DÙNG (GUI / CLI)
-# ══════════════════════════════════════════════════════════════════════════════
-
 def run_conversion(input_path: str, output_path: str = None):
     """Thực hiện chuyển đổi từ file đầu vào."""
     ext = Path(input_path).suffix.lower()
@@ -2181,8 +2090,8 @@ def run_conversion(input_path: str, output_path: str = None):
             blocks, meta = parse_litematic(input_path)
         elif ext == ".mcstructure":
             blocks, meta = parse_mcstructure(input_path)
-        elif ext == ".nbt":                                 # <--- THÊM DÒNG NÀY
-            blocks, meta = parse_structure_nbt(input_path)  # <--- THÊM DÒNG NÀY
+        elif ext == ".nbt":                                 
+            blocks, meta = parse_structure_nbt(input_path) 
         else:
             print(f"[CANH BAO] Phan mo rong khong ro '{ext}', thu tung parser...")
             parsed = False
@@ -2191,7 +2100,7 @@ def run_conversion(input_path: str, output_path: str = None):
                 (parse_litematic, ".litematic"),
                 (parse_schematic, ".schematic"),
                 (parse_mcstructure,".mcstructure"),
-                (parse_structure_nbt, ".nbt"),              # <--- THÊM VÀO FALLBACK
+                (parse_structure_nbt, ".nbt"),              
             ]:
                 try:
                     blocks, meta = parser_fn(input_path)
@@ -2225,7 +2134,6 @@ def run_conversion(input_path: str, output_path: str = None):
         path = filedialog.askopenfilename(
             title="Chọn file Minecraft Schematic / Structure",
             filetypes=[
-                # Thêm *.nbt vào danh sách
                 ("Minecraft structures", "*.schem *.schematic *.schm *.litematic *.mcstructure *.nbt"),
                 ("All files", "*.*")
             ]
@@ -2316,7 +2224,6 @@ def run_conversion(input_path: str, output_path: str = None):
 
 
 def inspect_nbt(file_path: str):
-    """In toàn bộ cấu trúc NBT của file để debug."""
     print(f"\n[INSPECT] Đang đọc cấu trúc NBT: {file_path}")
     try:
         nbt_file = nbtlib.load(file_path)
@@ -2342,15 +2249,6 @@ def inspect_nbt(file_path: str):
 
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  ENTRY POINT
-# ══════════════════════════════════════════════════════════════════════════════
-
-
-# =========================================================================
-# ⬆️⬆️ KẾT THÚC PHẦN DÁN CODE ⬆️⬆️
-# =========================================================================
-
 async def process_file(event):
     document.getElementById("log-output").value = "" # Xóa log cũ
     document.getElementById("download-link").style.display = "none"
@@ -2365,29 +2263,23 @@ async def process_file(event):
     print(f"[INFO] Đang chuyển dữ liệu vào hệ thống ảo...")
 
     try:
-        # 1. Đọc dữ liệu nhị phân từ HTML DOM
         array_buffer = await file.arrayBuffer()
         file_bytes = Uint8Array.new(array_buffer).to_py()
         
-        # 2. Ghi file vào hệ thống ảo của trình duyệt (Emscripten File System)
-        # Bằng cách này, hàm nbtlib.load(file_path) gốc của bạn sẽ hoạt động hoàn hảo!
         virtual_input_path = file.name
         with open(virtual_input_path, "wb") as f:
             f.write(bytes(file_bytes))
             
         virtual_output_path = "output_script.lua"
         
-        # 3. Kích hoạt logic chuyển đổi gốc của bạn
         print("-" * 50)
         result_path = run_conversion(virtual_input_path, virtual_output_path)
         print("-" * 50)
         
         if result_path:
-            # 4. Đọc file Lua ảo và đẩy ngược ra trình duyệt để người dùng tải về
             with open(result_path, "r", encoding="utf-8") as f:
                 lua_content = f.read()
             
-            # Khởi tạo Blob JavaScript để tạo link tải xuống
             blob = Blob.new([lua_content], type="text/plain")
             url = URL.createObjectURL(blob)
             
