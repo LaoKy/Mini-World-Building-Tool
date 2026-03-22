@@ -1988,14 +1988,21 @@ def generate_lua_script(blocks: list[BlockEntry], meta: dict, output_path: str):
     """
     Sinh file Lua từ danh sách BlockEntry.
     API Mini World: Block:setBlockAll(x, y, z, id, dir)
+    Tự động chia thành N bảng, mỗi bảng tối đa MAX_TABLE_SIZE phần tử.
     """
+    MAX_TABLE_SIZE = 260000  # Giới hạn phần tử mỗi bảng
     total = len(blocks)
     print(f"[INFO] Đang sinh Lua script cho {total} khối...")
 
-    chunk = (total + 2) // 3
-    part1 = blocks[:chunk]
-    part2 = blocks[chunk:chunk*2]
-    part3 = blocks[chunk*2:]
+    # Chia blocks thành các phần, mỗi phần tối đa MAX_TABLE_SIZE
+    num_tables = max(1, -(-total // MAX_TABLE_SIZE))  # ceiling division
+    parts = []
+    for i in range(num_tables):
+        start = i * MAX_TABLE_SIZE
+        end = min(start + MAX_TABLE_SIZE, total)
+        parts.append(blocks[start:end])
+
+    print(f"[INFO] Chia thanh {num_tables} bang (moi bang toi da {MAX_TABLE_SIZE} phan tu)")
 
     def format_table(entries: list[BlockEntry], table_name: str) -> str:
         lines = [f"local {table_name} = {{"]
@@ -2004,17 +2011,32 @@ def generate_lua_script(blocks: list[BlockEntry], meta: dict, output_path: str):
         lines.append("}")
         return "\n".join(lines)
 
+    # Tạo dòng thống kê cho header
+    part_info = " | ".join(f"Phan {i+1}: {len(p)} khoi" for i, p in enumerate(parts))
+
     lua_header = (
         f"-- Mini World Building Script (Auto Generated)\n"
         f"-- Kich thuoc: {meta.get('width',0)} x {meta.get('height',0)} x {meta.get('length',0)}"
         f"  |  Tong khoi: {total}\n"
-        f"-- Phan 1: {len(part1)} khoi | Phan 2: {len(part2)} khoi | Phan 3: {len(part3)} khoi\n"
+        f"-- {part_info}\n"
         f"-- Huong dan: Click vao block bat ky de dat moc, sau do go /build\n\n"
     )
 
-    lua_data1 = format_table(part1, "building_data_1")
-    lua_data2 = format_table(part2, "building_data_2")
-    lua_data3 = format_table(part3, "building_data_3")
+    # Sinh tất cả bảng dữ liệu
+    lua_data_parts = []
+    for i, part in enumerate(parts):
+        table_name = f"building_data_{i+1}"
+        lua_data_parts.append(format_table(part, table_name))
+
+    # Sinh vòng lặp /build động theo số bảng thực tế
+    build_loops = ""
+    for i in range(num_tables):
+        tname = f"building_data_{i+1}"
+        build_loops += f"""        for i = 1, #{tname} do
+            local d = {tname}[i]
+            Block:setBlockAll(originX + d[1], originY + d[2], originZ + d[3], d[4], d[5])
+        end
+"""
 
     lua_logic = f"""
 local originX, originY, originZ = nil, nil, nil
@@ -2024,7 +2046,7 @@ ScriptSupportEvent:registerEvent("Game.Start", function()
     Chat:sendSystemMsg("#Y#bHe thong san sang!")
     Chat:sendSystemMsg("#Y#bHay CLICK vao block bat ky de dat moc.")
     Chat:sendSystemMsg("#Y#bSau do go /build de xay dung.")
-    Chat:sendSystemMsg("#Y#bTong so khoi: {total}")
+    Chat:sendSystemMsg("#Y#bTong so khoi: {total} | So bang: {num_tables}")
     Chat:sendSystemMsg("#Y#b-- Made by Lao Ky --")
     Chat:sendSystemMsg("#Y#b==================================")
 end)
@@ -2044,20 +2066,8 @@ ScriptSupportEvent:registerEvent("Player.NewInputContent", function(e)
             Chat:sendSystemMsg("#R#bLoi: Ban chua chon vi tri moc!")
             return
         end
-        Chat:sendSystemMsg("#bBat dau xay dung... ({total} khoi)")
-        for i = 1, #building_data_1 do
-            local d = building_data_1[i]
-            Block:setBlockAll(originX + d[1], originY + d[2], originZ + d[3], d[4], d[5])
-        end
-        for i = 1, #building_data_2 do
-            local d = building_data_2[i]
-            Block:setBlockAll(originX + d[1], originY + d[2], originZ + d[3], d[4], d[5])
-        end
-        for i = 1, #building_data_3 do
-            local d = building_data_3[i]
-            Block:setBlockAll(originX + d[1], originY + d[2], originZ + d[3], d[4], d[5])
-        end
-        Chat:sendSystemMsg("#RHoan tat xay dung!")
+        Chat:sendSystemMsg("#bBat dau xay dung... ({total} khoi | {num_tables} bang)")
+{build_loops}        Chat:sendSystemMsg("#RHoan tat xay dung!")
     end
     if e.content == "/reset" then
         originX, originY, originZ = nil, nil, nil
@@ -2066,12 +2076,13 @@ ScriptSupportEvent:registerEvent("Player.NewInputContent", function(e)
 end)
 """
 
-    full_script = lua_header + lua_data1 + "\n\n" + lua_data2 + "\n\n" + lua_data3 + "\n" + lua_logic
+    full_script = lua_header + "\n\n".join(lua_data_parts) + "\n" + lua_logic
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(full_script)
 
     print(f"[OK] Da luu Lua script: {output_path}")
+    print(f"     So bang du lieu: {num_tables}")
     print(f"     Kich thuoc file: {os.path.getsize(output_path) / 1024:.1f} KB")
 
 def run_conversion(input_path: str, output_path: str = None):
