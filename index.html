@@ -95,7 +95,7 @@
         <a id="download-link" class="download-btn" style="display: none;">📥 Tải xuống Lua Script</a>
     </div>
 
-    <py-config>
+<py-config>
         packages = ["nbtlib"]
     </py-config>
 
@@ -110,7 +110,7 @@ from pathlib import Path
 from js import document, Uint8Array, Blob, URL
 from pyodide.ffi import to_js
 
-# --- CHUYỂN HƯỚNG PRINT VÀO TEXTAREA TRÊN WEB ---
+# ── CHUYỂN HƯỚNG PRINT VÀO TEXTAREA ──────────────────────────
 class WebConsole:
     def write(self, text):
         log_box = document.getElementById("log-output")
@@ -122,1124 +122,991 @@ class WebConsole:
 sys.stdout = WebConsole()
 sys.stderr = WebConsole()
 
-import os
-import sys
-import re
-import traceback
-from pathlib import Path
-
 try:
     import nbtlib
 except ImportError:
-    print("[LỖI] Chưa cài thư viện nbtlib. Chạy: pip install nbtlib")
-    sys.exit(1)
-
+    print("[LỖI] Không tải được nbtlib!")
 
 BLOCK_MAP: dict[str, int | None] = {
 
-    # ── Không khí & Vô hình (bỏ qua) ───────────────────────────────────────
+    # ── Không khí & vô hình ──────────────────────────────────────────────
     "minecraft:air":                    None,
     "minecraft:cave_air":               None,
     "minecraft:void_air":               None,
     "minecraft:barrier":                None,
     "minecraft:structure_void":         None,
-    "minecraft:light":                  None, # Block ánh sáng
+    "minecraft:light":                  None,   # Block ánh sáng
 
-    # ── Đá tự nhiên (Stone) ─────────────────────────────────────────────────
-    "minecraft:stone":                   104, # 104_stone (Đá thường)
-    "minecraft:cobblestone":             502, # 502_stonebrick_cracked (Đá cuội nứt)
-    "minecraft:mossy_cobblestone":       503, # 503_MossyStoneBrick (Đá rêu)
-    "minecraft:bedrock":                  40, # 40_void_block (Nền tảng vững chắc)
-    "minecraft:obsidian":                962, # 962_ultrastone_crackedstone (Đá đen nứt)
-    "minecraft:crying_obsidian":          40, # Dùng void_block cho biến thể khóc
-    "minecraft:andesite":                104, # 104_stone (Dùng chung đá)
-    "minecraft:polished_andesite":       505, # 505_StoneBlock (Đá bóng)
-    "minecraft:diorite":                 104, # 104_stone
-    "minecraft:polished_diorite":        505, # 505_StoneBlock
-    "minecraft:granite":                 104, # 104_stone
-    "minecraft:polished_granite":        505, # 505_StoneBlock
-    "minecraft:deepslate":               104, # 104_stone (Có thể dùng đá)
-    "minecraft:cobbled_deepslate":       502, # 502_stonebrick_cracked (Đá sâu cuội)
-    "minecraft:polished_deepslate":      505, # 505_StoneBlock
-    "minecraft:deepslate_bricks":        501, # 501_StoneBrick
-    "minecraft:cracked_deepslate_bricks": 502, # 502_CrazedStoneBrick
-    "minecraft:deepslate_tiles":         501, # 501_StoneBrick
-    "minecraft:cracked_deepslate_tiles": 502, # 502_CrazedStoneBrick
-    "minecraft:chiseled_deepslate":      504, # 504_PatternedStoneBrick
-    "minecraft:tuff":                    104, # 104_stone
-    "minecraft:calcite":                 505, # 505_StoneBlock (Trắng)
-    "minecraft:dripstone_block":         104, # 104_stone
-    "minecraft:smooth_basalt":           505, # 505_StoneBlock
-    "minecraft:basalt":                  104, # 104_stone
-    "minecraft:polished_basalt":         505, # 505_StoneBlock
+    # ── Đá cơ bản (Stone) ─────────────────────────────────────────────────
+    "minecraft:stone":                  104,    # 104_stone (Đá)
+    "minecraft:cobblestone":            502,    # 502_stonebrick_cracked (Đá cuội nứt)
+    "minecraft:mossy_cobblestone":      503,    # 503_MossyStoneBrick (Đá rêu)
+    "minecraft:bedrock":                1,      # 1_ultrastone (Đá Flamas, cứng như nền tảng)
+    "minecraft:obsidian":               962,    # 962_ultrastone_crackedstone (Đá đen nứt)
+    "minecraft:crying_obsidian":        962,    # Dùng chung
+    "minecraft:andesite":               104,    # 104_stone
+    "minecraft:polished_andesite":      505,    # 505_StoneBlock (Đá bóng)
+    "minecraft:diorite":                104,
+    "minecraft:polished_diorite":       505,
+    "minecraft:granite":                104,
+    "minecraft:polished_granite":       505,
+    "minecraft:deepslate":              104,    # 104_stone
+    "minecraft:cobbled_deepslate":      502,
+    "minecraft:polished_deepslate":     505,
+    "minecraft:deepslate_bricks":       501,    # 501_StoneBrick
+    "minecraft:cracked_deepslate_bricks":502,
+    "minecraft:deepslate_tiles":        501,
+    "minecraft:cracked_deepslate_tiles":502,
+    "minecraft:chiseled_deepslate":     504,    # 504_PatternedStoneBrick
+    "minecraft:tuff":                   104,
+    "minecraft:calcite":                505,    # 505_StoneBlock (trắng)
+    "minecraft:dripstone_block":        104,
+    "minecraft:smooth_basalt":          505,
+    "minecraft:basalt":                 104,
+    "minecraft:polished_basalt":        505,
+    "minecraft:blackstone":             682,    # 682_BlackHardSandBlock (đen)
+    "minecraft:gilded_blackstone":      682,
+    "minecraft:polished_blackstone":    505,
+    "minecraft:polished_blackstone_bricks": 501,
+    "minecraft:chiseled_polished_blackstone": 504,
+    "minecraft:netherrack":             132,    # 132_hotcrystal (Đá địa ngục)
+    "minecraft:end_stone":              116,    # 116_cosmic_rock_block (Đá vũ trụ)
+    "minecraft:end_stone_bricks":       116,
 
-    # ── Đất & Cỏ (Dirt & Grass) ─────────────────────────────────────────────
-    "minecraft:grass_block":             100, # 100_grass_block
-    "minecraft:dirt":                     101, # 101_dirt
-    "minecraft:coarse_dirt":             101, # 101_dirt
-    "minecraft:rooted_dirt":             101, # 101_dirt
-    "minecraft:podzol":                  233, # 233_redsoil (Đất đỏ - podzol)
-    "minecraft:mycelium":                 101, # 101_dirt (Tạm dùng đất)
-    "minecraft:farmland":                 102, # 102_arableland (Đất cày)
-    "minecraft:dirt_path":                 99, # 99_CityGround (Đường đất)
-    "minecraft:mud":                      101, # 101_dirt (Bùn)
-    "minecraft:packed_mud":               421, # 421_adobe (Bùn nén)
+    # ── Đất & Cỏ (Dirt & Grass) ──────────────────────────────────────────
+    "minecraft:grass_block":            100,    # 100_grass_block
+    "minecraft:dirt":                   101,    # 101_dirt
+    "minecraft:coarse_dirt":            101,
+    "minecraft:rooted_dirt":            101,
+    "minecraft:podzol":                 233,    # 233_redsoil (Đất đỏ)
+    "minecraft:mycelium":               101,    # Tạm dùng đất
+    "minecraft:farmland":               102,    # 102_arableland
+    "minecraft:dirt_path":              99,     # 99_CityGround (đường đất)
+    "minecraft:mud":                    101,
+    "minecraft:packed_mud":             421,    # 421_adobe (đất nện)
 
-    # ── Cát & Sa thạch (Sand & Sandstone) ───────────────────────────────────
-    "minecraft:sand":                     106, # 106_Sand
-    "minecraft:red_sand":                 128, # 128_red_sand
-    "minecraft:sandstone":                108, # 108_SandStone / 109_sandstone
-    "minecraft:chiseled_sandstone":       108, # 108_SandStone
-    "minecraft:cut_sandstone":            108, # 108_SandStone
-    "minecraft:smooth_sandstone":         540, # 540_Smoothsandstone
-    "minecraft:red_sandstone":            108, # 108_SandStone
-    "minecraft:chiseled_red_sandstone":   108, # 108_SandStone
-    "minecraft:cut_red_sandstone":        108, # 108_SandStone
-    "minecraft:smooth_red_sandstone":     540, # 540_Smoothsandstone
+    # ── Cát & Sa thạch (Sand & Sandstone) ─────────────────────────────────
+    "minecraft:sand":                   106,    # 106_Sand (Cát vàng)
+    "minecraft:red_sand":               128,    # 128_red_sand (Cát đỏ)
+    "minecraft:sandstone":              108,    # 108_SandStone
+    "minecraft:chiseled_sandstone":     108,
+    "minecraft:cut_sandstone":          108,
+    "minecraft:smooth_sandstone":       540,    # 540_Smoothsandstone
+    "minecraft:red_sandstone":          108,
+    "minecraft:chiseled_red_sandstone": 108,
+    "minecraft:cut_red_sandstone":      108,
+    "minecraft:smooth_red_sandstone":   540,
 
-    # ── Sỏi, Đất sét, Băng, Tuyết (Gravel, Clay, Ice, Snow) ─────────────────
-    "minecraft:gravel":                   107, # 107_gravel
-    "minecraft:clay":                     421, # 421_adobe
-    "minecraft:ice":                      123, # 123_ice
-    "minecraft:packed_ice":               131, # 131_eternal_ice (Băng vĩnh cửu)
-    "minecraft:blue_ice":                 123, # 123_ice (Băng xanh)
-    "minecraft:frosted_ice":               123, # 123_ice
-    "minecraft:snow_block":               115, # 115_snow
-    "minecraft:snow":                      115, # 115_snow
-    "minecraft:powder_snow":              115, # 115_snow
+    # ── Sỏi, Đất sét, Băng, Tuyết ────────────────────────────────────────
+    "minecraft:gravel":                 107,    # 107_gravel (Sỏi)
+    "minecraft:clay":                   421,    # 421_adobe (đất sét)
+    "minecraft:ice":                    123,    # 123_ice (Băng)
+    "minecraft:packed_ice":             131,    # 131_eternal_ice (Băng vĩnh cửu)
+    "minecraft:blue_ice":               123,
+    "minecraft:frosted_ice":            123,
+    "minecraft:snow_block":             115,    # 115_snow (Tuyết khối)
+    "minecraft:snow":                   115,    # Lớp tuyết mỏng
+    "minecraft:powder_snow":            115,
 
-    # ── Gỗ – Log (có hướng) ─────────────────────────────────────────────────
-    "minecraft:oak_log":                  200, # 200_log_fruittree_m
-    "minecraft:oak_wood":                 200, # 200_log_fruittree_m
-    "minecraft:stripped_oak_log":         200, # 200_log_fruittree_m (Dùng chung)
-    "minecraft:stripped_oak_wood":        200,
-    "minecraft:birch_log":                202, # 202_log_birch_m
-    "minecraft:birch_wood":               202,
-    "minecraft:stripped_birch_log":       202,
-    "minecraft:stripped_birch_wood":      202,
-    "minecraft:spruce_log":               201, # 201_log_cathaya_m
-    "minecraft:spruce_wood":              201,
-    "minecraft:stripped_spruce_log":      201,
-    "minecraft:stripped_spruce_wood":     201,
-    "minecraft:jungle_log":               203, # 203_log_redwood_m
-    "minecraft:jungle_wood":              203,
-    "minecraft:stripped_jungle_log":      203,
-    "minecraft:stripped_jungle_wood":     203,
-    "minecraft:acacia_log":                205, # 205_log_walnut_m (Gỗ keo tương tự gỗ óc chó)
-    "minecraft:acacia_wood":               205,
-    "minecraft:stripped_acacia_log":      205,
-    "minecraft:stripped_acacia_wood":     205,
-    "minecraft:dark_oak_log":             205, # 205_log_walnut_m (Gỗ sồi đen tương tự)
-    "minecraft:dark_oak_wood":            205,
-    "minecraft:stripped_dark_oak_log":    205,
-    "minecraft:stripped_dark_oak_wood":   205,
-    "minecraft:mangrove_log":             386, # 386_log_banana
-    "minecraft:mangrove_wood":            386,
-    "minecraft:stripped_mangrove_log":    386,
-    "minecraft:stripped_mangrove_wood":   386,
-    "minecraft:cherry_log":               254, # 254_log_peachblossom_m
-    "minecraft:cherry_wood":              254,
-    "minecraft:stripped_cherry_log":      254,
-    "minecraft:stripped_cherry_wood":     254,
-    "minecraft:bamboo_block":             563, # 563_planks_bamboo (Khối tre)
-    "minecraft:crimson_stem":             683, # 683_dragonbrick (Thân nấu đỏ - kiểu địa ngục)
-    "minecraft:crimson_hyphae":           683,
-    "minecraft:stripped_crimson_stem":    683,
-    "minecraft:stripped_crimson_hyphae":  683,
-    "minecraft:warped_stem":              683, # 683_dragonbrick (Thân nấu xanh)
-    "minecraft:warped_hyphae":            683,
-    "minecraft:stripped_warped_stem":     683,
-    "minecraft:stripped_warped_hyphae":   683,
+    # ── Gỗ – Thân cây (Log) ───────────────────────────────────────────────
+    "minecraft:oak_log":                200,    # 200_log_fruittree_m (Gỗ cây ăn quả)
+    "minecraft:oak_wood":               200,
+    "minecraft:stripped_oak_log":       200,
+    "minecraft:stripped_oak_wood":      200,
+    "minecraft:birch_log":              202,    # 202_log_birch_m (Gỗ bạch dương)
+    "minecraft:birch_wood":             202,
+    "minecraft:stripped_birch_log":     202,
+    "minecraft:stripped_birch_wood":    202,
+    "minecraft:spruce_log":             201,    # 201_log_cathaya_m (Gỗ thông)
+    "minecraft:spruce_wood":            201,
+    "minecraft:stripped_spruce_log":    201,
+    "minecraft:stripped_spruce_wood":   201,
+    "minecraft:jungle_log":             203,    # 203_log_redwood_m (Gỗ hồng sam)
+    "minecraft:jungle_wood":            203,
+    "minecraft:stripped_jungle_log":    203,
+    "minecraft:stripped_jungle_wood":   203,
+    "minecraft:acacia_log":             205,    # 205_log_walnut_m (Gỗ óc chó)
+    "minecraft:acacia_wood":            205,
+    "minecraft:stripped_acacia_log":    205,
+    "minecraft:stripped_acacia_wood":   205,
+    "minecraft:dark_oak_log":           205,
+    "minecraft:dark_oak_wood":          205,
+    "minecraft:stripped_dark_oak_log":  205,
+    "minecraft:stripped_dark_oak_wood": 205,
+    "minecraft:mangrove_log":           386,    # 386_log_banana (Gỗ chuối)
+    "minecraft:mangrove_wood":          386,
+    "minecraft:stripped_mangrove_log":  386,
+    "minecraft:stripped_mangrove_wood": 386,
+    "minecraft:cherry_log":             254,    # 254_log_peachblossom_m (Gỗ hoa đào)
+    "minecraft:cherry_wood":            254,
+    "minecraft:stripped_cherry_log":    254,
+    "minecraft:stripped_cherry_wood":   254,
+    "minecraft:bamboo_block":           563,    # 563_planks_bamboo (Khối tre)
+    "minecraft:crimson_stem":           683,    # 683_dragonbrick (Thân nấm đỏ)
+    "minecraft:crimson_hyphae":         683,
+    "minecraft:stripped_crimson_stem":  683,
+    "minecraft:stripped_crimson_hyphae":683,
+    "minecraft:warped_stem":            683,
+    "minecraft:warped_hyphae":          683,
+    "minecraft:stripped_warped_stem":   683,
+    "minecraft:stripped_warped_hyphae": 683,
 
-    # ── Gỗ – Ván (Planks) ───────────────────────────────────────────────────
-    "minecraft:oak_planks":               206, # 206_planks_fruittree
-    "minecraft:birch_planks":             207, # 207_LarchPlank
-    "minecraft:spruce_planks":            206, # 212_planks_arbor
-    "minecraft:jungle_planks":            209, # 209_RedWoodPlank
-    "minecraft:acacia_planks":            210, # 210_NanmuPlank
-    "minecraft:dark_oak_planks":          211, # 211_WalnutPlank
-    "minecraft:mangrove_planks":          206, # 206_planks_fruittree (Dùng chung)
-    "minecraft:cherry_planks":            562, # 562_planks_peachblossom
-    "minecraft:bamboo_planks":            251, # 251_bamboo_planks
-    "minecraft:crimson_planks":           206, # 206_planks_fruittree (Tạm dùng)
-    "minecraft:warped_planks":            206, # 206_planks_fruittree
+    # ── Ván gỗ (Planks) ───────────────────────────────────────────────────
+    "minecraft:oak_planks":             206,    # 206_planks_fruittree
+    "minecraft:birch_planks":           207,    # 207_LarchPlank
+    "minecraft:spruce_planks":          206,    # Dùng chung với oak
+    "minecraft:jungle_planks":          209,    # 209_RedWoodPlank
+    "minecraft:acacia_planks":          210,    # 210_NanmuPlank
+    "minecraft:dark_oak_planks":        211,    # 211_WalnutPlank
+    "minecraft:mangrove_planks":        206,
+    "minecraft:cherry_planks":          562,    # 562_planks_peachblossom
+    "minecraft:bamboo_planks":          251,    # 251_bamboo_planks
+    "minecraft:crimson_planks":         206,
+    "minecraft:warped_planks":          206,
 
-    # ── Lá cây (Leaves) ─────────────────────────────────────────────────────
-    "minecraft:oak_leaves":               218, # 218_leaves_fruittree
-    "minecraft:spruce_leaves":            219, # 219_leaves_larch
-    "minecraft:birch_leaves":             220, # 220_leaves_birch
-    "minecraft:jungle_leaves":            221, # 221_leaves_redwood
-    "minecraft:acacia_leaves":             223, # 223_leaves_walnut
-    "minecraft:dark_oak_leaves":          223, # 223_leaves_walnut
-    "minecraft:mangrove_leaves":          384, # 384_leaves_banana
-    "minecraft:cherry_leaves":            255, # 255_leaves_peachblossom
-    "minecraft:azalea_leaves":            218, # 218_leaves_fruittree
-    "minecraft:flowering_azalea_leaves":  218, # 218_leaves_fruittree (Có hoa, nhưng tạm dùng)
-    "minecraft:oak_leaves":               218,
-    "minecraft:spruce_leaves":            219,
-    "minecraft:birch_leaves":             220,
-    "minecraft:jungle_leaves":            221,
-    "minecraft:acacia_leaves":            223,
-    "minecraft:dark_oak_leaves":          223,
-    "minecraft:azalea_leaves":            218,
-    "minecraft:flowering_azalea_leaves":  218,
-    "minecraft:mangrove_leaves":          384,
-    "minecraft:cherry_leaves":            255,
-    "minecraft:crimson_nylium":           132, # 132_hotcrystal (Địa ngục đỏ)
-    "minecraft:warped_nylium":            132, # 132_hotcrystal (Địa ngục xanh)
+    # ── Lá cây (Leaves) ───────────────────────────────────────────────────
+    "minecraft:oak_leaves":             218,    # 218_leaves_fruittree
+    "minecraft:spruce_leaves":          219,    # 219_leaves_larch
+    "minecraft:birch_leaves":           220,    # 220_leaves_birch
+    "minecraft:jungle_leaves":          221,    # 221_leaves_redwood
+    "minecraft:acacia_leaves":          223,    # 223_leaves_walnut
+    "minecraft:dark_oak_leaves":        223,
+    "minecraft:mangrove_leaves":        384,    # 384_leaves_banana
+    "minecraft:cherry_leaves":          255,    # 255_leaves_peachblossom
+    "minecraft:azalea_leaves":          218,
+    "minecraft:flowering_azalea_leaves":218,
+    "minecraft:azalea":                 300,    # 300_bellflowers (bụi hoa)
+    "minecraft:flowering_azalea":       300,
 
-    # ── Cỏ, Cây nhỏ, Dây leo (Small Plants & Vines) ─────────────────────────
-    "minecraft:grass":                    224, # 224_tallgrass
-    "minecraft:tall_grass":               224, # 224_tallgrass
-    "minecraft:fern":                     238, # 238_fern
-    "minecraft:large_fern":               238, # 238_fern
-    "minecraft:dead_bush":                225, # 225_deadbush
-    "minecraft:vine":                      232, # 232_vine
-    "minecraft:glow_lichen":               232, # 232_vine (Địa y phát quang)
-    "minecraft:moss_block":                262, # 262_moss
-    "minecraft:moss_carpet":               262, # 262_moss
-    "minecraft:azalea":                   300, # 300_bellflowers (Cây bụi)
-    "minecraft:flowering_azalea":         300, # 300_bellflowers
-    "minecraft:big_dripleaf":              247, # 247_flower_floating (Lá lớn - dùng lá súng)
-    "minecraft:small_dripleaf":           247, # 247_flower_floating (Lá nhỏ)
-    "minecraft:spore_blossom":            247, # 247_flower_floating (Hoa bào tử)
+    # ── Thực vật nhỏ, cỏ, dây leo ─────────────────────────────────────────
+    "minecraft:grass":                  224,    # 224_tallgrass
+    "minecraft:tall_grass":             224,
+    "minecraft:fern":                   238,    # 238_fern
+    "minecraft:large_fern":             238,
+    "minecraft:dead_bush":              225,    # 225_deadbush
+    "minecraft:vine":                   232,    # 232_vine
+    "minecraft:glow_lichen":            232,
+    "minecraft:moss_block":             262,    # 262_moss
+    "minecraft:moss_carpet":            262,
+    "minecraft:big_dripleaf":           247,    # 247_flower_floating (lá sen)
+    "minecraft:small_dripleaf":         247,
+    "minecraft:spore_blossom":          247,
+    "minecraft:hanging_roots":          232,    # rễ treo
+    "minecraft:twisting_vines":         232,
+    "minecraft:weeping_vines":          232,
+    "minecraft:cave_vines":             232,
+    "minecraft:cave_vines_plant":       232,
 
-    # ── Hoa (Flowers) ───────────────────────────────────────────────────────
-    "minecraft:dandelion":                302, # 302_starflower
-    "minecraft:poppy":                    313, # 313_rose
-    "minecraft:blue_orchid":              304, # 304_hyacinth
-    "minecraft:allium":                   301, # 301_ruolan
-    "minecraft:azure_bluet":              311, # 311_whitemums
-    "minecraft:red_tulip":                313, # 313_rose (Hoa tulip đỏ)
-    "minecraft:orange_tulip":             303, # 303_dragonflower (Cam)
-    "minecraft:white_tulip":              311, # 311_whitemums (Trắng)
-    "minecraft:pink_tulip":               310, # 310_agave_pink (Hồng)
-    "minecraft:oxeye_daisy":              311, # 311_whitemums
-    "minecraft:cornflower":               304, # 304_hyacinth (Xanh)
-    "minecraft:lily_of_the_valley":       311, # 311_whitemums (Trắng)
-    "minecraft:wither_rose":              313, # 313_rose (Hoa héo - đen)
-    "minecraft:sunflower":                312, # 312_yellowelder (Hoa hướng dương)
-    "minecraft:lilac":                    313, # 313_rose (Tử đinh hương)
-    "minecraft:rose_bush":                313, # 313_rose (Bụi hồng)
-    "minecraft:peony":                    313, # 313_rose (Hoa mẫu đơn)
-    "minecraft:pitcher_plant":            313, # 313_rose (Cây bình rượu)
+    # ── Hoa (Flowers) ─────────────────────────────────────────────────────
+    "minecraft:dandelion":              302,    # 302_starflower (hoa sao)
+    "minecraft:poppy":                  313,    # 313_rose (hoa hồng)
+    "minecraft:blue_orchid":            304,    # 304_hyacinth (dạ lan)
+    "minecraft:allium":                 301,    # 301_ruolan (hoa nhược lan)
+    "minecraft:azure_bluet":            311,    # 311_whitemums (hoa cúc trắng)
+    "minecraft:red_tulip":              313,
+    "minecraft:orange_tulip":           303,    # 303_dragonflower (hoa máu rồng)
+    "minecraft:white_tulip":            311,
+    "minecraft:pink_tulip":             310,    # 310_agave_pink (cây thùa hồng)
+    "minecraft:oxeye_daisy":            311,
+    "minecraft:cornflower":             304,
+    "minecraft:lily_of_the_valley":     311,
+    "minecraft:wither_rose":            313,
+    "minecraft:sunflower":              312,    # 312_yellowelder (hoa chuông vàng)
+    "minecraft:lilac":                  313,
+    "minecraft:rose_bush":              313,
+    "minecraft:peony":                  313,
+    "minecraft:pitcher_plant":          313,
+    "minecraft:torchflower":            302,
 
-    # ── Cây trồng (Crops) ───────────────────────────────────────────────────
-    "minecraft:wheat":                    234, # 234_rice (lúa) - thay vì 102_arableland
-    "minecraft:potatoes":                 241, # 241_yams (khoai lang) - cây lấy củ
-    "minecraft:carrots":                  236, # 236_cucumber (dưa chuột) - cây thân thấp
-    "minecraft:beetroots":                227, # 227_zisuguo (cây củ cải tím) - dùng cho củ cải đường
-    "minecraft:pumpkin_stem":             229, # 229_corn (ngô) - thân cây cao
-    "minecraft:melon_stem":                243, # 243_corn (ngô) - thân cây cao (ID khác để phân biệt)
-    "minecraft:sweet_berry_bush":          227, # 227_zisuguo (cây bụi có quả)
-    "minecraft:cocoa":                     228, # 228_dukui (cây ca cao)
-    "minecraft:sugar_cane":               253, # 253_bamboo_shoot (Mía - dùng măng tre)
-    "minecraft:cactus":                   242, # 242_cactus
-    "minecraft:bamboo":                    251, # 251_bamboo_shoot
-    "minecraft:kelp":                     246, # 246_seaweed
-    "minecraft:kelp_plant":               246, # 246_seaweed
-    "minecraft:seagrass":                 245, # 245_waterweed
-    "minecraft:tall_seagrass":            245, # 245_waterweed
-    "minecraft:sea_pickle":                247, # 247_flower_floating (Dưa chuột biển)
+    # ── Cây trồng (Crops) ─────────────────────────────────────────────────
+    "minecraft:wheat":                  234,    # 234_rice (lúa)
+    "minecraft:potatoes":               241,    # 241_yams (khoai lang)
+    "minecraft:carrots":                236,    # 236_cucumber (dưa chuột)
+    "minecraft:beetroots":              227,    # 227_zisuguo (tía tô)
+    "minecraft:pumpkin_stem":           229,    # 229_corn (ngô)
+    "minecraft:melon_stem":             243,    # 243_corn (ngô dại)
+    "minecraft:sweet_berry_bush":       227,
+    "minecraft:cocoa":                  228,    # 228_dukui (độc quy)
+    "minecraft:sugar_cane":             253,    # 253_bamboo_shoot (măng tre)
+    "minecraft:cactus":                 242,    # 242_cactus (xương rồng)
+    "minecraft:bamboo":                 251,    # 251_bamboo_planks (cây tre)
+    "minecraft:kelp":                   246,    # 246_seaweed (rong biển)
+    "minecraft:kelp_plant":             246,
+    "minecraft:seagrass":               245,    # 245_waterweed (cỏ thủy sinh)
+    "minecraft:tall_seagrass":          245,
+    "minecraft:sea_pickle":             247,
+    "minecraft:nether_wart":            227,
+    "minecraft:warped_wart":            227,
 
-    # ── Khối nước & Dung nham (Liquid) ──────────────────────────────────────
-    "minecraft:water":                    3, # 558_honey_water (Nước mật ong - tạm)
-    "minecraft:flowing_water":            4,
-    "minecraft:lava":                     5,   # 5_lava_still
-    "minecraft:flowing_lava":             6,
+    # ── Nước & Dung nham ──────────────────────────────────────────────────
+    "minecraft:water":                  3,      # 3_StaticWater (tĩnh thủy)
+    "minecraft:flowing_water":          4,      # 4_WaterFlow (nước động)
+    "minecraft:lava":                   5,      # 5_lava_still (dung nham tĩnh)
+    "minecraft:flowing_lava":           6,      # 6_lava_flow (dung nham động)
 
-    # ── Khối trang trí & Nội thất (Decoration) ──────────────────────────────
-    "minecraft:glass":                    633, # 633
-    "minecraft:tinted_glass":             633, # 633 (Kính màu)
-    "minecraft:white_stained_glass":      633,
-    "minecraft:orange_stained_glass":     633,
-    "minecraft:magenta_stained_glass":    633,
-    "minecraft:light_blue_stained_glass": 633,
-    "minecraft:yellow_stained_glass":     633,
-    "minecraft:lime_stained_glass":       633,
-    "minecraft:pink_stained_glass":       633,
-    "minecraft:gray_stained_glass":       633,
-    "minecraft:light_gray_stained_glass": 633,
-    "minecraft:cyan_stained_glass":       633,
-    "minecraft:purple_stained_glass":     633,
-    "minecraft:blue_stained_glass":       633,
-    "minecraft:brown_stained_glass":      633,
-    "minecraft:green_stained_glass":      633,
-    "minecraft:red_stained_glass":        633,
-    "minecraft:black_stained_glass":      633,
-    "minecraft:glass_pane":                556, # 556_windows_glass
+    # ── Kính & Gương ──────────────────────────────────────────────────────
+    "minecraft:glass":                  649,    # 649_GlassWindow (kính cửa sổ)
+    "minecraft:tinted_glass":           649,
+    "minecraft:glass_pane":             556,    # 556_windows_glass (cửa sổ kính)
+    # Các màu kính (stained glass) dùng chung ID 649, vì Mini World có thể nhuộm
+    "minecraft:white_stained_glass":    649,
+    "minecraft:orange_stained_glass":   649,
+    "minecraft:magenta_stained_glass":  649,
+    "minecraft:light_blue_stained_glass":649,
+    "minecraft:yellow_stained_glass":   649,
+    "minecraft:lime_stained_glass":     649,
+    "minecraft:pink_stained_glass":     649,
+    "minecraft:gray_stained_glass":     649,
+    "minecraft:light_gray_stained_glass":649,
+    "minecraft:cyan_stained_glass":     649,
+    "minecraft:purple_stained_glass":   649,
+    "minecraft:blue_stained_glass":     649,
+    "minecraft:brown_stained_glass":    649,
+    "minecraft:green_stained_glass":    649,
+    "minecraft:red_stained_glass":      649,
+    "minecraft:black_stained_glass":    649,
+    # Kính pane màu tương tự
     "minecraft:white_stained_glass_pane": 556,
     "minecraft:orange_stained_glass_pane":556,
     "minecraft:magenta_stained_glass_pane":556,
     "minecraft:light_blue_stained_glass_pane":556,
     "minecraft:yellow_stained_glass_pane":556,
-    "minecraft:lime_stained_glass_pane":  556,
-    "minecraft:pink_stained_glass_pane":  556,
-    "minecraft:gray_stained_glass_pane":  556,
+    "minecraft:lime_stained_glass_pane":556,
+    "minecraft:pink_stained_glass_pane":556,
+    "minecraft:gray_stained_glass_pane":556,
     "minecraft:light_gray_stained_glass_pane":556,
-    "minecraft:cyan_stained_glass_pane":  556,
+    "minecraft:cyan_stained_glass_pane":556,
     "minecraft:purple_stained_glass_pane":556,
-    "minecraft:blue_stained_glass_pane":  556,
-    "minecraft:brown_stained_glass_pane": 556,
-    "minecraft:green_stained_glass_pane": 556,
-    "minecraft:red_stained_glass_pane":   556,
-    "minecraft:black_stained_glass_pane": 556,
+    "minecraft:blue_stained_glass_pane":556,
+    "minecraft:brown_stained_glass_pane":556,
+    "minecraft:green_stained_glass_pane":556,
+    "minecraft:red_stained_glass_pane": 556,
+    "minecraft:black_stained_glass_pane":556,
 
-    # ── Gạch (Bricks) ───────────────────────────────────────────────────────
-    "minecraft:bricks":                   547, # 547_brick (Gạch đỏ)
-    "minecraft:brick_slab":               510, # 510_Redbrickstep
-    "minecraft:brick_stairs":             530, # 530_Redbrickstair
-    "minecraft:brick_wall":               547, # 547_brick
+    # ── Len (Wool) & Thảm (Carpet) ────────────────────────────────────────
+    "minecraft:white_wool":             600,    # 600_SheepWool
+    "minecraft:orange_wool":            601,    # 601_OrangeSheepWool
+    "minecraft:magenta_wool":           602,    # 602_MagentaSheepWool
+    "minecraft:light_blue_wool":        603,    # 603_LightblueSheepWool
+    "minecraft:yellow_wool":            604,    # 604_YellowSheepWool
+    "minecraft:lime_wool":              605,    # 605_YellowgreenSheepWool
+    "minecraft:pink_wool":              606,    # 606_PinkSheepWool
+    "minecraft:gray_wool":              607,    # 607_GreySheepWool
+    "minecraft:light_gray_wool":        608,    # 608_LightgreySheepWool
+    "minecraft:cyan_wool":              609,    # 609_CyanSheepWool
+    "minecraft:purple_wool":            610,    # 610_PurpleSheepWool
+    "minecraft:blue_wool":              611,    # 611_BlueSheepWool
+    "minecraft:brown_wool":             612,    # 612_BrownSheepWool
+    "minecraft:green_wool":             613,    # 613_GreenSheepWool
+    "minecraft:red_wool":               614,    # 614_RedSheepWool
+    "minecraft:black_wool":             615,    # 615_BlackSheepWool
 
-    "minecraft:stone_bricks":             501, # 501_StoneBrick
-    "minecraft:mossy_stone_bricks":       503, # 503_MossyStoneBrick
-    "minecraft:cracked_stone_bricks":     502, # 502_CrazedStoneBrick
-    "minecraft:chiseled_stone_bricks":    504, # 504_PatternedStoneBrick
-    "minecraft:stone_brick_slab":         511, # 511_Stonebrickstep
-    "minecraft:stone_brick_stairs":       531, # 531_Stonebrickstair
-    "minecraft:stone_brick_wall":         501, # 501_StoneBrick
+    "minecraft:white_carpet":           616,    # 616_Carpet
+    "minecraft:orange_carpet":          617,    # 617_Orangewoolcarpet
+    "minecraft:magenta_carpet":         618,    # 618_Magentawoolcarpet
+    "minecraft:light_blue_carpet":      619,    # 619_Lightbluewoolcarpet
+    "minecraft:yellow_carpet":          620,    # 620_Yellowwoolcarpet
+    "minecraft:lime_carpet":            621,    # 621_Yellowgreenwoolcarpet
+    "minecraft:pink_carpet":            622,    # 622_Pinkwoolcarpet
+    "minecraft:gray_carpet":            623,    # 623_Greywoolcarpet
+    "minecraft:light_gray_carpet":      624,    # 624_Lightgreywoolcarpet
+    "minecraft:cyan_carpet":            625,    # 625_Cyanwoolcarpet
+    "minecraft:purple_carpet":          626,    # 626_Purplewoolcarpet
+    "minecraft:blue_carpet":            627,    # 627_Bluewoolcarpet
+    "minecraft:brown_carpet":           628,    # 628_Brownwoolcarpet
+    "minecraft:green_carpet":           629,    # 629_Greenwoolcarpet
+    "minecraft:red_carpet":             630,    # 630_Redwoolcarpet
+    "minecraft:black_carpet":           631,    # 631_Blackwoolcarpet
 
-    # ── Len (Wool) & Thảm (Carpet) ──────────────────────────────────────────
-    "minecraft:white_wool":               600, # 600_SheepWool
-    "minecraft:orange_wool":              601, # 601_OrangeSheepWool
-    "minecraft:magenta_wool":             602, # 602_MagentaSheepWool
-    "minecraft:light_blue_wool":          603, # 603_LightblueSheepWool
-    "minecraft:yellow_wool":              604, # 604_YellowSheepWool
-    "minecraft:lime_wool":                605, # 605_YellowgreenSheepWool
-    "minecraft:pink_wool":                606, # 606_PinkSheepWool
-    "minecraft:gray_wool":                607, # 607_GreySheepWool
-    "minecraft:light_gray_wool":          608, # 608_LightgreySheepWool
-    "minecraft:cyan_wool":                609, # 609_CyanSheepWool
-    "minecraft:purple_wool":              610, # 610_PurpleSheepWool
-    "minecraft:blue_wool":                611, # 611_BlueSheepWool
-    "minecraft:brown_wool":               612, # 612_BrownSheepWool
-    "minecraft:green_wool":               613, # 613_GreenSheepWool
-    "minecraft:red_wool":                 614, # 614_RedSheepWool
-    "minecraft:black_wool":               615, # 615_BlackSheepWool
-
-    "minecraft:white_carpet":             616, # 616_Carpet
-    "minecraft:orange_carpet":            617, # 617_Orangewoolcarpet
-    "minecraft:magenta_carpet":           618, # 618_Magentawoolcarpet
-    "minecraft:light_blue_carpet":        619, # 619_Lightbluewoolcarpet
-    "minecraft:yellow_carpet":            620, # 620_Yellowwoolcarpet
-    "minecraft:lime_carpet":              621, # 621_Yellowgreenwoolcarpet
-    "minecraft:pink_carpet":              622, # 622_Pinkwoolcarpet
-    "minecraft:gray_carpet":              623, # 623_Greywoolcarpet
-    "minecraft:light_gray_carpet":        624, # 624_Lightgreywoolcarpet
-    "minecraft:cyan_carpet":              625, # 625_Cyanwoolcarpet
-    "minecraft:purple_carpet":            626, # 626_Purplewoolcarpet
-    "minecraft:blue_carpet":              627, # 627_Bluewoolcarpet
-    "minecraft:brown_carpet":             628, # 628_Brownwoolcarpet
-    "minecraft:green_carpet":             629, # 629_Greenwoolcarpet
-    "minecraft:red_carpet":               630, # 630_Redwoolcarpet
-    "minecraft:black_carpet":             631, # 631_Blackwoolcarpet
-
-    # ── Bê tông (Concrete) ───────────────────────────────────────────────────
-    "minecraft:white_concrete":           667, # 667_WhiteHardSandBlock
-    "minecraft:orange_concrete":          668, # 668_OrangeHardSandBlock
-    "minecraft:magenta_concrete":         669, # 669_MagentaHardSandBlock
-    "minecraft:light_blue_concrete":      670, # 670_LightBlueHardSandBlock
-    "minecraft:yellow_concrete":          671, # 671_YellowHardSandBlock
-    "minecraft:lime_concrete":            672, # 672_YellowGreenHardSandBlock
-    "minecraft:pink_concrete":            673, # 673_PinkHardSandBlock
-    "minecraft:gray_concrete":            674, # 674_GreyHardSandBlock
-    "minecraft:light_gray_concrete":      675, # 675_LightGreyHardSandBlock
-    "minecraft:cyan_concrete":            676, # 676_CyanHardSandBlock
-    "minecraft:purple_concrete":          677, # 677_PurpleHardSandBlock
-    "minecraft:blue_concrete":            678, # 678_BlueHardSandBlock
-    "minecraft:brown_concrete":           679, # 679_BrownHardSandBlock
-    "minecraft:green_concrete":           680, # 680_GreenHardSandBlock
-    "minecraft:red_concrete":             681, # 681_RedHardSandBlock
-    "minecraft:black_concrete":           682, # 682_BlackHardSandBlock
-    "minecraft:white_concrete_powder":    667,
-    "minecraft:orange_concrete_powder":   668,
-    "minecraft:magenta_concrete_powder":  669,
+    # ── Bê tông (Concrete) ────────────────────────────────────────────────
+    "minecraft:white_concrete":         667,    # 667_WhiteHardSandBlock
+    "minecraft:orange_concrete":        668,    # 668_OrangeHardSandBlock
+    "minecraft:magenta_concrete":       669,    # 669_MagentaHardSandBlock
+    "minecraft:light_blue_concrete":    670,    # 670_LightBlueHardSandBlock
+    "minecraft:yellow_concrete":        671,    # 671_YellowHardSandBlock
+    "minecraft:lime_concrete":          672,    # 672_YellowGreenHardSandBlock
+    "minecraft:pink_concrete":          673,    # 673_PinkHardSandBlock
+    "minecraft:gray_concrete":          674,    # 674_GreyHardSandBlock
+    "minecraft:light_gray_concrete":    675,    # 675_LightGreyHardSandBlock
+    "minecraft:cyan_concrete":          676,    # 676_CyanHardSandBlock
+    "minecraft:purple_concrete":        677,    # 677_PurpleHardSandBlock
+    "minecraft:blue_concrete":          678,    # 678_BlueHardSandBlock
+    "minecraft:brown_concrete":         679,    # 679_BrownHardSandBlock
+    "minecraft:green_concrete":         680,    # 680_GreenHardSandBlock
+    "minecraft:red_concrete":           681,    # 681_RedHardSandBlock
+    "minecraft:black_concrete":         682,    # 682_BlackHardSandBlock
+    # Bột bê tông (concrete powder) – dùng cùng ID với khối cứng
+    "minecraft:white_concrete_powder":  667,
+    "minecraft:orange_concrete_powder": 668,
+    "minecraft:magenta_concrete_powder":669,
     "minecraft:light_blue_concrete_powder":670,
-    "minecraft:yellow_concrete_powder":   671,
-    "minecraft:lime_concrete_powder":     672,
-    "minecraft:pink_concrete_powder":     673,
-    "minecraft:gray_concrete_powder":     674,
+    "minecraft:yellow_concrete_powder": 671,
+    "minecraft:lime_concrete_powder":   672,
+    "minecraft:pink_concrete_powder":   673,
+    "minecraft:gray_concrete_powder":   674,
     "minecraft:light_gray_concrete_powder":675,
-    "minecraft:cyan_concrete_powder":     676,
-    "minecraft:purple_concrete_powder":   677,
-    "minecraft:blue_concrete_powder":     678,
-    "minecraft:brown_concrete_powder":    679,
-    "minecraft:green_concrete_powder":    680,
-    "minecraft:red_concrete_powder":      681,
-    "minecraft:black_concrete_powder":    682,
+    "minecraft:cyan_concrete_powder":   676,
+    "minecraft:purple_concrete_powder": 677,
+    "minecraft:blue_concrete_powder":   678,
+    "minecraft:brown_concrete_powder":  679,
+    "minecraft:green_concrete_powder":  680,
+    "minecraft:red_concrete_powder":    681,
+    "minecraft:black_concrete_powder":  682,
 
-    # ── Terracotta (Đất nung) ───────────────────────────────────────────────
-    "minecraft:terracotta":               424, # 424_sand_brick
-    "minecraft:white_terracotta":         424,
-    "minecraft:orange_terracotta":        424,
-    "minecraft:magenta_terracotta":       424,
-    "minecraft:light_blue_terracotta":    424,
-    "minecraft:yellow_terracotta":        424,
-    "minecraft:lime_terracotta":          424,
-    "minecraft:pink_terracotta":          424,
-    "minecraft:gray_terracotta":          424,
-    "minecraft:light_gray_terracotta":    424,
-    "minecraft:cyan_terracotta":          424,
-    "minecraft:purple_terracotta":        424,
-    "minecraft:blue_terracotta":          424,
-    "minecraft:brown_terracotta":         424,
-    "minecraft:green_terracotta":         424,
-    "minecraft:red_terracotta":           424,
-    "minecraft:black_terracotta":         424,
+    # ── Terracotta (Đất nung) ─────────────────────────────────────────────
+    "minecraft:terracotta":             424,    # 424_sand_brick
+    "minecraft:white_terracotta":       424,
+    "minecraft:orange_terracotta":      424,
+    "minecraft:magenta_terracotta":     424,
+    "minecraft:light_blue_terracotta":  424,
+    "minecraft:yellow_terracotta":      424,
+    "minecraft:lime_terracotta":        424,
+    "minecraft:pink_terracotta":        424,
+    "minecraft:gray_terracotta":        424,
+    "minecraft:light_gray_terracotta":  424,
+    "minecraft:cyan_terracotta":        424,
+    "minecraft:purple_terracotta":      424,
+    "minecraft:blue_terracotta":        424,
+    "minecraft:brown_terracotta":       424,
+    "minecraft:green_terracotta":       424,
+    "minecraft:red_terracotta":         424,
+    "minecraft:black_terracotta":       424,
+    # Glazed terracotta (gạch tráng men) – dùng các ID 425-429
+    "minecraft:white_glazed_terracotta":    425,   # 425_glazed_tile
+    "minecraft:orange_glazed_terracotta":   426,   # 426_glazed_tile_1
+    "minecraft:magenta_glazed_terracotta":  427,   # 427_glazed_tile_2
+    "minecraft:light_blue_glazed_terracotta":428,  # 428_glazed_tile_3
+    "minecraft:yellow_glazed_terracotta":   429,   # 429_glazed_tile_4
+    "minecraft:lime_glazed_terracotta":     425,
+    "minecraft:pink_glazed_terracotta":     426,
+    "minecraft:gray_glazed_terracotta":     427,
+    "minecraft:light_gray_glazed_terracotta":428,
+    "minecraft:cyan_glazed_terracotta":     429,
+    "minecraft:purple_glazed_terracotta":   425,
+    "minecraft:blue_glazed_terracotta":     426,
+    "minecraft:brown_glazed_terracotta":    427,
+    "minecraft:green_glazed_terracotta":    428,
+    "minecraft:red_glazed_terracotta":      429,
+    "minecraft:black_glazed_terracotta":    425,
 
-    # ── Khối khoáng sản & Kim loại (Ores & Metal Blocks) ────────────────────
-    "minecraft:coal_ore":                 402, # 402_gashydrate_ore (quặng khí hydrat - đen)
-    "minecraft:deepslate_coal_ore":       402,
-    "minecraft:iron_ore":                 456, # 449_horascopper_block (quặng đồng horas - nâu đỏ)
-    "minecraft:deepslate_iron_ore":       456,
-    "minecraft:copper_ore":               456,
-    "minecraft:deepslate_copper_ore":     456,
-    "minecraft:gold_ore":                 408, # 408_tungstengold_block (vàng tungsten)
-    "minecraft:deepslate_gold_ore":       408,
-    "minecraft:redstone_ore":              412, # 412_silica_block (silica - trắng, tạm dùng)
-    "minecraft:deepslate_redstone_ore":   412,
-    "minecraft:emerald_ore":               409, # 409_malachite_block (malachit - xanh lục)
-    "minecraft:deepslate_emerald_ore":    409,
-    "minecraft:lapis_ore":                 411, # 411_mithsilver_block (mithsilver - xanh dương)
-    "minecraft:deepslate_lapis_ore":      411,
-    "minecraft:diamond_ore":               410, # 410_flamecrystal_block (tinh thể lửa - sáng)
-    "minecraft:deepslate_diamond_ore":    410,
-    "minecraft:nether_quartz_ore":        132, # 132_hotcrystal (tinh thể nóng - địa ngục)
-    "minecraft:nether_gold_ore":          132,
-    "minecraft:ancient_debris":           457, # 457_titanium_block (titan)
+    # ── Gạch các loại (Bricks, Stone bricks) ──────────────────────────────
+    "minecraft:bricks":                 547,    # 547_brick (gạch đỏ)
+    "minecraft:brick_slab":             510,    # 510_Redbrickstep
+    "minecraft:brick_stairs":           530,    # 530_Redbrickstair
+    "minecraft:brick_wall":             547,
+    "minecraft:stone_bricks":           501,    # 501_StoneBrick
+    "minecraft:mossy_stone_bricks":     503,    # 503_MossyStoneBrick
+    "minecraft:cracked_stone_bricks":   502,    # 502_CrazedStoneBrick
+    "minecraft:chiseled_stone_bricks":  504,    # 504_PatternedStoneBrick
+    "minecraft:stone_brick_slab":       511,    # 511_Stonebrickstep
+    "minecraft:stone_brick_stairs":     531,    # 531_Stonebrickstair
+    "minecraft:stone_brick_wall":       501,
+    "minecraft:nether_bricks":          683,    # 683_dragonbrick (gạch rồng)
+    "minecraft:cracked_nether_bricks":  683,
+    "minecraft:chiseled_nether_bricks": 683,
+    "minecraft:nether_brick_fence":     538,    # 538_Sulfurbrickfence
+    "minecraft:nether_brick_slab":      512,    # 512_Sulfurbrickstep
+    "minecraft:nether_brick_stairs":    532,    # 532_Sulfurbrickstair
+    "minecraft:nether_brick_wall":      683,
+    "minecraft:red_nether_bricks":      683,
+    "minecraft:prismarine":             502,
+    "minecraft:prismarine_bricks":      501,
+    "minecraft:dark_prismarine":        502,
+    "minecraft:prismarine_stairs":      529,
+    "minecraft:prismarine_brick_stairs":529,
+    "minecraft:dark_prismarine_stairs": 529,
+    "minecraft:prismarine_slab":        506,
+    "minecraft:prismarine_brick_slab":  506,
+    "minecraft:dark_prismarine_slab":   506,
+    "minecraft:quartz_block":           540,    # 540_Smoothsandstone (thạch anh trắng)
+    "minecraft:quartz_pillar":          540,
+    "minecraft:chiseled_quartz_block":  540,
+    "minecraft:smooth_quartz":          540,
+    "minecraft:quartz_bricks":          540,
+    "minecraft:quartz_stairs":          529,
+    "minecraft:quartz_slab":            506,
+    "minecraft:smooth_quartz_slab":     506,
+    "minecraft:smooth_quartz_stairs":   529,
+    "minecraft:purpur_block":           112,    # 112_blackcrystal (pha lê đen)
+    "minecraft:purpur_pillar":          112,
+    "minecraft:purpur_slab":            112,
+    "minecraft:purpur_stairs":          112,
+    "minecraft:end_stone_brick_slab":   116,
+    "minecraft:end_stone_brick_stairs": 116,
+    "minecraft:end_stone_brick_wall":   116,
+    "minecraft:bone_block":             447,    # 447_mysterious_fossil (hóa thạch)
 
-    "minecraft:coal_block":               402, # 402_gashydrate_ore (khối than)
-    "minecraft:raw_iron_block":           449, # 449_horascopper_block (sắt thô)
-    "minecraft:iron_block":               456, # 456_brass_block (đồng thau - sáng bóng)
-    "minecraft:raw_copper_block":         449, # 449_horascopper_block (đồng thô)
-    "minecraft:copper_block":             456,
-    "minecraft:exposed_copper":           456,
-    "minecraft:weathered_copper":         456,
-    "minecraft:oxidized_copper":          456,
-    "minecraft:waxed_copper_block":       456,
-    "minecraft:waxed_exposed_copper":     456,
-    "minecraft:waxed_weathered_copper":   456,
-    "minecraft:waxed_oxidized_copper":    456,
-    "minecraft:raw_gold_block":           408, # 408_tungstengold_block (vàng thô)
-    "minecraft:gold_block":               408,
-    "minecraft:diamond_block":            410, # 410_flamecrystal_block
-    "minecraft:emerald_block":            409, # 409_malachite_block
-    "minecraft:lapis_block":              411, # 411_mithsilver_block
-    "minecraft:redstone_block":           412, # 412_silica_block (hoặc 411)
-    "minecraft:netherite_block":          457, # 457_titanium_block
+    # ── Khối khoáng sản & Kim loại (Ores & Metal blocks) ──────────────────
+    "minecraft:coal_ore":               402,    # 402_gashydrate_ore (quặng khí hydrat)
+    "minecraft:deepslate_coal_ore":     402,
+    "minecraft:iron_ore":               456,    # 456_brass_block (quặng đồng thau)
+    "minecraft:deepslate_iron_ore":     456,
+    "minecraft:copper_ore":             456,
+    "minecraft:deepslate_copper_ore":   456,
+    "minecraft:gold_ore":               408,    # 408_tungstengold_block (vàng tungsten)
+    "minecraft:deepslate_gold_ore":     408,
+    "minecraft:redstone_ore":           412,    # 412_silica_block (silica)
+    "minecraft:deepslate_redstone_ore": 412,
+    "minecraft:emerald_ore":            409,    # 409_malachite_block (malachit)
+    "minecraft:deepslate_emerald_ore":  409,
+    "minecraft:lapis_ore":              411,    # 411_mithsilver_block (mithsilver)
+    "minecraft:deepslate_lapis_ore":    411,
+    "minecraft:diamond_ore":            410,    # 410_flamecrystal_block (tinh thể lửa)
+    "minecraft:deepslate_diamond_ore":  410,
+    "minecraft:nether_quartz_ore":      132,    # 132_hotcrystal (tinh thể nóng)
+    "minecraft:nether_gold_ore":        132,
+    "minecraft:ancient_debris":         457,    # 457_titanium_block (titan)
+    # Khối kim loại tinh khiết
+    "minecraft:coal_block":             402,
+    "minecraft:iron_block":             456,
+    "minecraft:copper_block":           456,
+    "minecraft:exposed_copper":         456,
+    "minecraft:weathered_copper":       456,
+    "minecraft:oxidized_copper":        456,
+    "minecraft:waxed_copper_block":     456,
+    "minecraft:cut_copper":             456,
+    "minecraft:cut_copper_stairs":      529,
+    "minecraft:cut_copper_slab":        506,
+    "minecraft:gold_block":             408,
+    "minecraft:diamond_block":          410,
+    "minecraft:emerald_block":          409,
+    "minecraft:lapis_block":            411,
+    "minecraft:redstone_block":         412,
+    "minecraft:netherite_block":        457,
+    "minecraft:raw_iron_block":         449,    # 449_horascopper_block
+    "minecraft:raw_copper_block":       449,
+    "minecraft:raw_gold_block":         408,
 
-    "minecraft:coal_block":               104, # 104_stone (Dùng đá cho than)
-    "minecraft:raw_iron_block":           749, # 749_brass_block (Sắt thô)
-    "minecraft:iron_block":               749, # 749_brass_block
-    "minecraft:raw_copper_block":         449, # 449_horascopper_block
-    "minecraft:copper_block":             456,
-    "minecraft:exposed_copper":           456,
-    "minecraft:weathered_copper":         456,
-    "minecraft:oxidized_copper":          456,
-    "minecraft:waxed_copper_block":       456,
-    "minecraft:waxed_exposed_copper":     456,
-    "minecraft:waxed_weathered_copper":   456,
-    "minecraft:waxed_oxidized_copper":    456,
-    "minecraft:raw_gold_block":           408, # 408_tungstengold_block
-    "minecraft:gold_block":               408,
-    "minecraft:diamond_block":            410, # 410_flamecrystal_block
-    "minecraft:emerald_block":            409, # 409_malachite_block
-    "minecraft:lapis_block":              411, # 411_mithsilver_block
-    "minecraft:redstone_block":           411,
-    "minecraft:netherite_block":          457, # 457_titanium_block
+    # ── Khối đặc biệt địa ngục (Nether) ───────────────────────────────────
+    "minecraft:crimson_nylium":         132,
+    "minecraft:warped_nylium":          132,
+    "minecraft:soul_sand":              109,    # 109_SandySoil (đất cát)
+    "minecraft:soul_soil":              109,
+    "minecraft:nether_wart_block":      132,
+    "minecraft:warped_wart_block":      132,
+    "minecraft:shroomlight":            550,    # 550_glowstone2 (đá phát sáng)
+    "minecraft:magma_block":            140,    # 140_volcanoaltar_earth_on (bàn thờ núi lửa)
+    "minecraft:glowstone":              550,
+    "minecraft:sea_lantern":            550,
+    "minecraft:jack_o_lantern":         550,
 
-    # ── Đá địa ngục & Gạch (Nether) ─────────────────────────────────────────
-    "minecraft:netherrack":               132, # 132_hotcrystal
-    "minecraft:crimson_nylium":           132,
-    "minecraft:warped_nylium":            132,
-    "minecraft:soul_sand":                109, # 109_SandySoil (Đất cát hồn)
-    "minecraft:soul_soil":                109,
-    "minecraft:basalt":                   104,
-    "minecraft:polished_basalt":          505,
-    "minecraft:smooth_basalt":            505,
-    "minecraft:blackstone":               682, # 682_BlackHardSandBlock
-    "minecraft:gilded_blackstone":        682,
-    "minecraft:nether_bricks":            683, # 683_dragonbrick
-    "minecraft:cracked_nether_bricks":    683,
-    "minecraft:chiseled_nether_bricks":   683,
-    "minecraft:nether_brick_fence":       538, # 538_Sulfurbrickfence
-    "minecraft:nether_brick_slab":        512, # 512_Sulfurbrickstep
-    "minecraft:nether_brick_stairs":      532, # 532_Sulfurbrickstair
-    "minecraft:nether_brick_wall":        683,
-    "minecraft:red_nether_bricks":        683,
-    "minecraft:nether_wart_block":        132,
-    "minecraft:warped_wart_block":        132,
-    "minecraft:shroomlight":              550, # 550_glowstone2
-    "minecraft:magma_block":              140, # 140_volcanoaltar_earth_on
+    # ── Khối The End ──────────────────────────────────────────────────────
+    "minecraft:chorus_plant":           112,
+    "minecraft:chorus_flower":          112,
 
-    # ── Khối The End ────────────────────────────────────────────────────────
-    "minecraft:end_stone":                 116, # 116_cosmic_rock_block
-    "minecraft:end_stone_bricks":         116,
-    "minecraft:end_stone_brick_slab":     116,
-    "minecraft:end_stone_brick_stairs":   116,
-    "minecraft:end_stone_brick_wall":     116,
-    "minecraft:purpur_block":             112, # 112_blackcrystal
-    "minecraft:purpur_pillar":            112,
-    "minecraft:purpur_slab":              112,
-    "minecraft:purpur_stairs":            112,
-    "minecraft:chorus_plant":             112,
-    "minecraft:chorus_flower":            112,
+    # ── San hô (Coral) ────────────────────────────────────────────────────
+    "minecraft:tube_coral_block":       488,    # 488_bubblecoral
+    "minecraft:brain_coral_block":      490,    # 490_disccoral
+    "minecraft:bubble_coral_block":     488,
+    "minecraft:fire_coral_block":       492,    # 492_treecoral
+    "minecraft:horn_coral_block":       486,    # 486_horncoral
+    "minecraft:dead_tube_coral_block":  489,    # 489_deadbubblecoral
+    "minecraft:dead_brain_coral_block": 491,    # 491_deaddisccoral
+    "minecraft:dead_bubble_coral_block":489,
+    "minecraft:dead_fire_coral_block":  493,    # 493_deadtreecoral
+    "minecraft:dead_horn_coral_block":  487,    # 487_deadhorncoral
+    "minecraft:tube_coral":             488,
+    "minecraft:brain_coral":            490,
+    "minecraft:bubble_coral":           488,
+    "minecraft:fire_coral":             492,
+    "minecraft:horn_coral":             486,
+    "minecraft:dead_tube_coral":        489,
+    "minecraft:dead_brain_coral":       491,
+    "minecraft:dead_bubble_coral":      489,
+    "minecraft:dead_fire_coral":        493,
+    "minecraft:dead_horn_coral":        487,
+    "minecraft:tube_coral_fan":         488,
+    "minecraft:brain_coral_fan":        490,
+    "minecraft:bubble_coral_fan":       488,
+    "minecraft:fire_coral_fan":         492,
+    "minecraft:horn_coral_fan":         486,
+    "minecraft:dead_tube_coral_fan":    489,
+    "minecraft:dead_brain_coral_fan":   491,
+    "minecraft:dead_bubble_coral_fan":  489,
+    "minecraft:dead_fire_coral_fan":    493,
+    "minecraft:dead_horn_coral_fan":    487,
 
-    # ── Đá sa thạch & Gạch các loại (Other Stone-like) ──────────────────────
-    "minecraft:prismarine":               502, # 502_stonebrick_cracked
-    "minecraft:prismarine_bricks":        501, # 501_StoneBrick
-    "minecraft:dark_prismarine":          502,
-    "minecraft:sea_lantern":              550, # 550_glowstone2
+    # ── Sponge (Bọt biển) ─────────────────────────────────────────────────
+    "minecraft:sponge":                 127,    # 127_Sponge
+    "minecraft:wet_sponge":             127,
 
-    # ── San hô (Coral) ───────────────────────────────────────────────────────
-    "minecraft:tube_coral_block":         488, # 488_bubblecoral
-    "minecraft:brain_coral_block":        490, # 490_disccoral
-    "minecraft:bubble_coral_block":       488, # 488_bubblecoral
-    "minecraft:fire_coral_block":         492, # 492_treecoral
-    "minecraft:horn_coral_block":         486, # 486_horncoral
-    "minecraft:dead_tube_coral_block":    489, # 489_deadbubblecoral
-    "minecraft:dead_brain_coral_block":   491, # 491_deaddisccoral
-    "minecraft:dead_bubble_coral_block":  489,
-    "minecraft:dead_fire_coral_block":    493, # 493_deadtreecoral
-    "minecraft:dead_horn_coral_block":    487, # 487_deadhorncoral
-    "minecraft:tube_coral":               488,
-    "minecraft:brain_coral":              490,
-    "minecraft:bubble_coral":             488,
-    "minecraft:fire_coral":               492,
-    "minecraft:horn_coral":               486,
-    "minecraft:dead_tube_coral":          489,
-    "minecraft:dead_brain_coral":         491,
-    "minecraft:dead_bubble_coral":        489,
-    "minecraft:dead_fire_coral":          493,
-    "minecraft:dead_horn_coral":          487,
-    "minecraft:tube_coral_fan":           488,
-    "minecraft:brain_coral_fan":          490,
-    "minecraft:bubble_coral_fan":         488,
-    "minecraft:fire_coral_fan":           492,
-    "minecraft:horn_coral_fan":           486,
-    "minecraft:dead_tube_coral_fan":      489,
-    "minecraft:dead_brain_coral_fan":     491,
-    "minecraft:dead_bubble_coral_fan":    489,
-    "minecraft:dead_fire_coral_fan":      493,
-    "minecraft:dead_horn_coral_fan":      487,
+    # ── Nấm (Mushrooms) ───────────────────────────────────────────────────
+    "minecraft:brown_mushroom":         465,    # 465_mushroom_redpoisonous (nấm độc)
+    "minecraft:red_mushroom":           465,
+    "minecraft:crimson_fungus":         465,
+    "minecraft:warped_fungus":          465,
+    "minecraft:brown_mushroom_block":   270,    # 270_starmashroom (nấm sao)
+    "minecraft:red_mushroom_block":     270,
+    "minecraft:mushroom_stem":          270,
+    "minecraft:crimson_roots":          238,
+    "minecraft:warped_roots":           238,
+    "minecraft:nether_sprouts":         238,
 
-    # ── Sponge (Bọt biển) ───────────────────────────────────────────────────
-    "minecraft:sponge":                   127, # 127_Sponge
-    "minecraft:wet_sponge":               127,
+    # ── Đèn & Nguồn sáng ──────────────────────────────────────────────────
+    "minecraft:torch":                  934,    # 934_wall_lamp_on (đèn tường)
+    "minecraft:wall_torch":             934,
+    "minecraft:soul_torch":             934,
+    "minecraft:soul_wall_torch":        934,
+    "minecraft:lantern":                899,    # 899_lamp2 (đèn lồng)
+    "minecraft:soul_lantern":           907,    # 907_gudeng_rock (đèn đá)
+    "minecraft:campfire":               1200,   # 1200_bonfire (lửa trại)
+    "minecraft:soul_campfire":          1200,
+    "minecraft:redstone_lamp":          861,    # 861_glowstone_lamp_wood (đèn gỗ)
+    "minecraft:shroomlight":            550,
+    "minecraft:sea_lantern":            550,
+    "minecraft:jack_o_lantern":         550,
+    "minecraft:end_rod":                934,
+    "minecraft:redstone_torch":         934,
+    "minecraft:redstone_wall_torch":    934,
 
-    # ── Nấm & Khối nấm (Mushrooms) ──────────────────────────────────────────
-    "minecraft:brown_mushroom":           465, # 465_mushroom_redpoisonous
-    "minecraft:red_mushroom":             465,
-    "minecraft:crimson_fungus":           465,
-    "minecraft:warped_fungus":            465,
-    "minecraft:brown_mushroom_block":     270, # 270_starmashroom
-    "minecraft:red_mushroom_block":       270,
-    "minecraft:mushroom_stem":            270,
-    "minecraft:crimson_roots":            238, # 238_fern
-    "minecraft:warped_roots":             238,
-    "minecraft:nether_sprouts":           238,
+    # ── Khối chức năng (Functional) ───────────────────────────────────────
+    "minecraft:furnace":                802,    # 802_rock_smelter (lò đá)
+    "minecraft:blast_furnace":          798,    # 798_mithsilver_smelter (lò bạc)
+    "minecraft:smoker":                 799,    # 799_brass_smelter (lò đồng)
+    "minecraft:crafting_table":         797,    # 797_intact_table (bàn chế tác)
+    "minecraft:cartography_table":      797,
+    "minecraft:fletching_table":        797,
+    "minecraft:smithing_table":         797,
+    "minecraft:loom":                   797,
+    "minecraft:stonecutter":            802,
+    "minecraft:grindstone":             802,
+    "minecraft:anvil":                  797,
+    "minecraft:chipped_anvil":          797,
+    "minecraft:damaged_anvil":          797,
+    "minecraft:chest":                  733,    # 733_jar4 (hũ lớn)
+    "minecraft:trapped_chest":          737,    # 737_jar1 (hũ đơn giản)
+    "minecraft:barrel":                 739,    # 739_jar3 (hũ gốm màu)
+    "minecraft:ender_chest":            738,    # 738_jar2 (hũ gốm đất)
+    "minecraft:shulker_box":            1180,   # 1180_chest (rương lớn)
+    "minecraft:white_shulker_box":      1180,
+    "minecraft:orange_shulker_box":     1180,
+    "minecraft:magenta_shulker_box":    1180,
+    "minecraft:light_blue_shulker_box": 1180,
+    "minecraft:yellow_shulker_box":     1180,
+    "minecraft:lime_shulker_box":       1180,
+    "minecraft:pink_shulker_box":       1180,
+    "minecraft:gray_shulker_box":       1180,
+    "minecraft:light_gray_shulker_box": 1180,
+    "minecraft:cyan_shulker_box":       1180,
+    "minecraft:purple_shulker_box":     1180,
+    "minecraft:blue_shulker_box":       1180,
+    "minecraft:brown_shulker_box":      1180,
+    "minecraft:green_shulker_box":      1180,
+    "minecraft:red_shulker_box":        1180,
+    "minecraft:black_shulker_box":      1180,
+    "minecraft:jukebox":                726,    # 726_piano (đàn piano)
+    "minecraft:note_block":             726,
+    "minecraft:composter":              821,    # 821_wood_pile (cọc gỗ)
+    "minecraft:cauldron":               738,
+    "minecraft:water_cauldron":         738,
+    "minecraft:lava_cauldron":          738,
+    "minecraft:powder_snow_cauldron":   738,
+    "minecraft:brewing_stand":          738,
+    "minecraft:beacon":                 1060,   # 1060_reflect_glass (gương phản chiếu)
+    "minecraft:conduit":                550,
+    "minecraft:enchanting_table":       797,
+    "minecraft:end_portal_frame":       116,
+    "minecraft:respawn_anchor":         140,
+    "minecraft:lodestone":              410,
+    "minecraft:beehive":                133,    # 133_hive_empty (tổ ong rỗng)
+    "minecraft:bee_nest":               1019,   # 1019_nest_block (tổ ong)
+    "minecraft:honey_block":            558,    # 558_honey_water (mật ong)
+    "minecraft:honeycomb_block":        134,    # 134_hive_full (tổ ong đầy)
+    "minecraft:bookshelf":              820,    # 820_Bookcase (tủ sách)
+    "minecraft:chiseled_bookshelf":     820,
+    "minecraft:lectern":                1143,   # 1143_book_editortable (bàn viết sách)
+    "minecraft:daylight_detector":      731,    # 731_skylight (giếng trời)
+    "minecraft:hopper":                 802,
+    "minecraft:observer":               505,
+    "minecraft:piston":                 505,
+    "minecraft:piston_head":            505,
+    "minecraft:moving_piston":          505,
+    "minecraft:repeater":               360,
+    "minecraft:comparator":             360,
+    "minecraft:lever":                  363,
+    "minecraft:bell":                   931,
+    "minecraft:target":                 822,    # 822_hay_block (rơm)
+    "minecraft:crafter":                802,
+    "minecraft:trial_spawner":          684,
+    "minecraft:vault":                  1180,
+    "minecraft:heavy_core":             962,
 
-    # ── Đá phát sáng & Đèn (Glowstone & Lights) ──────────────────────────────
-    "minecraft:glowstone":                550, # 550_glowstone2
-    "minecraft:shroomlight":              550,
-    "minecraft:sea_lantern":              550,
-    "minecraft:jack_o_lantern":           550,
-    "minecraft:redstone_lamp":            861, # 861_glowstone_lamp_wood
+    # ── Cầu thang (Stairs) ────────────────────────────────────────────────
+    "minecraft:oak_stairs":             520,    # 520_Fruittreewoodstair
+    "minecraft:spruce_stairs":          523,    # 523_Redcedarwoodstair
+    "minecraft:birch_stairs":           521,    # 521_Larchwoodstair
+    "minecraft:jungle_stairs":          520,
+    "minecraft:acacia_stairs":          524,    # 524_Nanmuwoodstair
+    "minecraft:dark_oak_stairs":        525,    # 525_Walnutwoodstair
+    "minecraft:mangrove_stairs":        520,
+    "minecraft:cherry_stairs":          520,
+    "minecraft:bamboo_stairs":          520,
+    "minecraft:crimson_stairs":         520,
+    "minecraft:warped_stairs":          520,
+    "minecraft:cobblestone_stairs":     529,    # 529_Stonecubestair
+    "minecraft:stone_stairs":           529,
+    "minecraft:stone_brick_stairs":     531,    # 531_Stonebrickstair
+    "minecraft:mossy_stone_brick_stairs":531,
+    "minecraft:andesite_stairs":        529,
+    "minecraft:polished_andesite_stairs":529,
+    "minecraft:diorite_stairs":         529,
+    "minecraft:polished_diorite_stairs":529,
+    "minecraft:granite_stairs":         529,
+    "minecraft:polished_granite_stairs":529,
+    "minecraft:sandstone_stairs":       527,    # 527_Sandstonestair
+    "minecraft:red_sandstone_stairs":   527,
+    "minecraft:brick_stairs":           530,    # 530_Redbrickstair
+    "minecraft:nether_brick_stairs":    532,    # 532_Sulfurbrickstair
+    "minecraft:red_nether_brick_stairs":532,
+    "minecraft:purpur_stairs":          112,
+    "minecraft:blackstone_stairs":      529,
+    "minecraft:polished_blackstone_stairs": 529,
+    "minecraft:polished_blackstone_brick_stairs": 531,
+    "minecraft:cobbled_deepslate_stairs":  529,
+    "minecraft:polished_deepslate_stairs": 529,
+    "minecraft:deepslate_brick_stairs":    531,
+    "minecraft:deepslate_tile_stairs":     531,
+    "minecraft:cut_copper_stairs":         529,
+    "minecraft:waxed_cut_copper_stairs":   529,
+    "minecraft:tuff_stairs":               529,
+    "minecraft:polished_tuff_stairs":      529,
+    "minecraft:tuff_brick_stairs":         531,
 
-    "minecraft:torch":                    934, # 934_wall_lamp_on
-    "minecraft:wall_torch":               861,
-    "minecraft:soul_torch":               861,
-    "minecraft:soul_wall_torch":          861,
-    "minecraft:lantern":                   899, # 899_lamp2
-    "minecraft:soul_lantern":            907, # 907_lamp3
-    "minecraft:campfire":                  1200, # 1200_bonfire
-    "minecraft:soul_campfire":             1200,
+    # ── Tấm nửa (Slabs) ───────────────────────────────────────────────────
+    "minecraft:oak_slab":               514,    # 514_Fruittreewoodstep
+    "minecraft:spruce_slab":            517,    # 517_Redcedarstep
+    "minecraft:birch_slab":             515,    # 515_Larchstep
+    "minecraft:jungle_slab":            514,
+    "minecraft:acacia_slab":            518,    # 518_Nanmustep
+    "minecraft:dark_oak_slab":          519,    # 519_Walnutstep
+    "minecraft:mangrove_slab":          514,
+    "minecraft:cherry_slab":            514,
+    "minecraft:bamboo_slab":            514,
+    "minecraft:crimson_slab":           514,
+    "minecraft:warped_slab":            514,
+    "minecraft:stone_slab":             506,    # 506_stone_slab
+    "minecraft:smooth_stone_slab":      506,
+    "minecraft:cobblestone_slab":       509,    # 509_Stonecubestep
+    "minecraft:stone_brick_slab":       511,    # 511_Stonebrickstep
+    "minecraft:mossy_stone_brick_slab": 511,
+    "minecraft:andesite_slab":          506,
+    "minecraft:polished_andesite_slab": 506,
+    "minecraft:diorite_slab":           506,
+    "minecraft:polished_diorite_slab":  506,
+    "minecraft:granite_slab":           506,
+    "minecraft:polished_granite_slab":  506,
+    "minecraft:sandstone_slab":         507,    # 507_Sandstonestep
+    "minecraft:cut_sandstone_slab":     507,
+    "minecraft:smooth_sandstone_slab":  507,
+    "minecraft:red_sandstone_slab":     507,
+    "minecraft:cut_red_sandstone_slab": 507,
+    "minecraft:smooth_red_sandstone_slab":507,
+    "minecraft:brick_slab":             510,    # 510_Redbrickstep
+    "minecraft:nether_brick_slab":      512,    # 512_Sulfurbrickstep
+    "minecraft:red_nether_brick_slab":  512,
+    "minecraft:purpur_slab":            112,
+    "minecraft:quartz_slab":            506,
+    "minecraft:smooth_quartz_slab":     506,
+    "minecraft:blackstone_slab":        506,
+    "minecraft:polished_blackstone_slab":506,
+    "minecraft:polished_blackstone_brick_slab": 511,
+    "minecraft:cobbled_deepslate_slab":     509,
+    "minecraft:polished_deepslate_slab":    509,
+    "minecraft:deepslate_brick_slab":       511,
+    "minecraft:deepslate_tile_slab":        511,
+    "minecraft:cut_copper_slab":            506,
+    "minecraft:waxed_cut_copper_slab":      506,
+    "minecraft:tuff_slab":                  506,
+    "minecraft:polished_tuff_slab":         506,
+    "minecraft:tuff_brick_slab":            511,
 
-    # ── Khối chức năng (Functional Blocks) ───────────────────────────────────
-    "minecraft:furnace":                   802, # 802_rock_smelter
-    "minecraft:blast_furnace":             798, # 798_mithsilver_smelter
-    "minecraft:smoker":                    799, # 799_brass_smelter
-    "minecraft:crafting_table":            797, # 797_intact_table
-    "minecraft:cartography_table":         797,
-    "minecraft:fletching_table":           797,
-    "minecraft:smithing_table":            797,
-    "minecraft:loom":                      797,
-    "minecraft:stonecutter":                802, # 802_rock_smelter
-    "minecraft:grindstone":                802,
-    "minecraft:anvil":                     797, # 797_intact_table
-    "minecraft:chipped_anvil":             797,
-    "minecraft:damaged_anvil":             797,
+    # ── Hàng rào (Fences) & Tường (Walls) ─────────────────────────────────
+    "minecraft:oak_fence":              534,    # 534_Fence
+    "minecraft:birch_fence":            553,    # 553_fence_normalwood
+    "minecraft:spruce_fence":           539,    # 539_fence_poplarwood
+    "minecraft:jungle_fence":           534,
+    "minecraft:acacia_fence":           553,
+    "minecraft:dark_oak_fence":         539,
+    "minecraft:mangrove_fence":         534,
+    "minecraft:cherry_fence":           553,
+    "minecraft:bamboo_fence":           534,
+    "minecraft:crimson_fence":          683,
+    "minecraft:warped_fence":           683,
+    "minecraft:nether_brick_fence":     538,
+    "minecraft:iron_bars":              526,    # 526_Ironbar
+    "minecraft:chain":                  526,
+    "minecraft:oak_fence_gate":         535,    # 535_Fencegate
+    "minecraft:birch_fence_gate":       535,
+    "minecraft:spruce_fence_gate":      535,
+    "minecraft:jungle_fence_gate":      535,
+    "minecraft:acacia_fence_gate":      535,
+    "minecraft:dark_oak_fence_gate":    535,
+    "minecraft:mangrove_fence_gate":    535,
+    "minecraft:cherry_fence_gate":      535,
+    "minecraft:bamboo_fence_gate":      535,
+    "minecraft:crimson_fence_gate":     535,
+    "minecraft:warped_fence_gate":      535,
+    # Tường đá (walls) từ các loại đá
+    "minecraft:cobblestone_wall":       502,
+    "minecraft:mossy_cobblestone_wall": 503,
+    "minecraft:stone_brick_wall":       501,
+    "minecraft:mossy_stone_brick_wall": 503,
+    "minecraft:andesite_wall":          502,
+    "minecraft:diorite_wall":           502,
+    "minecraft:granite_wall":           502,
+    "minecraft:polished_andesite_wall": 505,
+    "minecraft:polished_diorite_wall":  505,
+    "minecraft:polished_granite_wall":  505,
+    "minecraft:brick_wall":             547,
+    "minecraft:sandstone_wall":         108,
+    "minecraft:red_sandstone_wall":     108,
+    "minecraft:end_stone_brick_wall":   116,
+    "minecraft:nether_brick_wall":      683,
+    "minecraft:red_nether_brick_wall":  683,
+    "minecraft:blackstone_wall":        682,
+    "minecraft:polished_blackstone_wall": 505,
+    "minecraft:polished_blackstone_brick_wall": 501,
+    "minecraft:cobbled_deepslate_wall":     502,
+    "minecraft:polished_deepslate_wall":    505,
+    "minecraft:deepslate_brick_wall":       501,
+    "minecraft:deepslate_tile_wall":        501,
+    "minecraft:tuff_wall":                  502,
+    "minecraft:polished_tuff_wall":         505,
+    "minecraft:tuff_brick_wall":            501,
 
-    "minecraft:chest":                      969, # 733_jar4
-    "minecraft:trapped_chest":              737, # 737_jar1
-    "minecraft:barrel":                     739, # 739_jar3
-    "minecraft:ender_chest":                738, # 738_jar2
-    "minecraft:shulker_box":                1180, # 1180_chest
-    "minecraft:white_shulker_box":          1180,
-    "minecraft:orange_shulker_box":         1180,
-    "minecraft:magenta_shulker_box":        1180,
-    "minecraft:light_blue_shulker_box":     1180,
-    "minecraft:yellow_shulker_box":         1180,
-    "minecraft:lime_shulker_box":           1180,
-    "minecraft:pink_shulker_box":           1180,
-    "minecraft:gray_shulker_box":           1180,
-    "minecraft:light_gray_shulker_box":     1180,
-    "minecraft:cyan_shulker_box":           1180,
-    "minecraft:purple_shulker_box":         1180,
-    "minecraft:blue_shulker_box":           1180,
-    "minecraft:brown_shulker_box":          1180,
-    "minecraft:green_shulker_box":          1180,
-    "minecraft:red_shulker_box":            1180,
-    "minecraft:black_shulker_box":          1180,
+    # ── Cửa (Doors) ───────────────────────────────────────────────────────
+    "minecraft:oak_door":               854,    # 854_door_phoebe
+    "minecraft:birch_door":             856,    # 856_door_birch
+    "minecraft:spruce_door":            860,    # 860_door_cathaya
+    "minecraft:jungle_door":            855,    # 855_door_walnut
+    "minecraft:acacia_door":            854,
+    "minecraft:dark_oak_door":          858,    # 858_door_redwood
+    "minecraft:mangrove_door":          854,
+    "minecraft:cherry_door":            854,
+    "minecraft:bamboo_door":            854,
+    "minecraft:crimson_door":           683,
+    "minecraft:warped_door":            683,
+    "minecraft:iron_door":              857,    # 857_door_gold
+    "minecraft:copper_door":            857,
+    "minecraft:exposed_copper_door":    857,
+    "minecraft:weathered_copper_door":  857,
+    "minecraft:oxidized_copper_door":   857,
+    "minecraft:waxed_copper_door":      857,
+    "minecraft:waxed_exposed_copper_door":857,
+    "minecraft:waxed_weathered_copper_door":857,
+    "minecraft:waxed_oxidized_copper_door":857,
 
-    "minecraft:jukebox":                    726, # 726_piano
-    "minecraft:note_block":                 726,
-    "minecraft:composter":                  821, # 821_wood_pile
-    "minecraft:cauldron":                   738,
-    "minecraft:water_cauldron":             738,
-    "minecraft:lava_cauldron":              738,
-    "minecraft:powder_snow_cauldron":       738,
-    "minecraft:brewing_stand":              738,
-    "minecraft:beacon":                     1060, # 1060_reflect_glass
-    "minecraft:conduit":                    550,
-    "minecraft:enchanting_table":            797, # 797_intact_table
-    "minecraft:end_portal_frame":           116, # 116_cosmic_rock_block
+    # ── Cửa sập (Trapdoors) ───────────────────────────────────────────────
+    "minecraft:oak_trapdoor":           555,    # 555_windows_wood
+    "minecraft:birch_trapdoor":         555,
+    "minecraft:spruce_trapdoor":        555,
+    "minecraft:jungle_trapdoor":        555,
+    "minecraft:acacia_trapdoor":        555,
+    "minecraft:dark_oak_trapdoor":      555,
+    "minecraft:mangrove_trapdoor":      555,
+    "minecraft:cherry_trapdoor":        555,
+    "minecraft:bamboo_trapdoor":        555,
+    "minecraft:crimson_trapdoor":       555,
+    "minecraft:warped_trapdoor":        555,
+    "minecraft:iron_trapdoor":          526,
+    "minecraft:copper_trapdoor":        526,
+    "minecraft:exposed_copper_trapdoor":526,
+    "minecraft:weathered_copper_trapdoor":526,
+    "minecraft:oxidized_copper_trapdoor":526,
+    "minecraft:waxed_copper_trapdoor":  526,
+    "minecraft:waxed_exposed_copper_trapdoor":526,
+    "minecraft:waxed_weathered_copper_trapdoor":526,
+    "minecraft:waxed_oxidized_copper_trapdoor":526,
 
-    # ── Cầu thang (Stairs) ───────────────────────────────────────────────────
-    "minecraft:oak_stairs":                 520, # 520_Fruittreewoodstair
-    "minecraft:spruce_stairs":              523, # 523_Redcedarwoodstair
-    "minecraft:birch_stairs":               521, # 521_Larchwoodstair
-    "minecraft:jungle_stairs":              520,
-    "minecraft:acacia_stairs":              524, # 524_Nanmuwoodstair
-    "minecraft:dark_oak_stairs":            525, # 525_Walnutwoodstair
-    "minecraft:mangrove_stairs":            520,
-    "minecraft:cherry_stairs":              520, # 520_Fruittreewoodstair
-    "minecraft:bamboo_stairs":              520,
-    "minecraft:crimson_stairs":             520,
-    "minecraft:warped_stairs":               520,
-    "minecraft:cobblestone_stairs":         529, # 529_Stonecubestair
-    "minecraft:stone_stairs":               529,
-    "minecraft:stone_brick_stairs":         531, # 531_Stonebrickstair
-    "minecraft:mossy_stone_brick_stairs":   531,
-    "minecraft:andesite_stairs":            529,
-    "minecraft:polished_andesite_stairs":   529,
-    "minecraft:diorite_stairs":             529,
-    "minecraft:polished_diorite_stairs":    529,
-    "minecraft:granite_stairs":             529,
-    "minecraft:polished_granite_stairs":    529,
-    "minecraft:sandstone_stairs":           527, # 527_Sandstonestair
-    "minecraft:red_sandstone_stairs":       527,
-    "minecraft:brick_stairs":                530, # 530_Redbrickstair
-    "minecraft:nether_brick_stairs":        532, # 532_Sulfurbrickstair
-    "minecraft:red_nether_brick_stairs":    532,
-    "minecraft:quartz_stairs":              529,
-    "minecraft:purpur_stairs":              112,
-    "minecraft:prismarine_stairs":          529,
-    "minecraft:prismarine_brick_stairs":    529,
-    "minecraft:dark_prismarine_stairs":     529,
+    # ── Giường (Beds) ─────────────────────────────────────────────────────
+    "minecraft:white_bed":              883,    # 883_bed1
+    "minecraft:orange_bed":             883,
+    "minecraft:magenta_bed":            884,    # 884_bed2
+    "minecraft:light_blue_bed":         885,    # 885_bed3
+    "minecraft:yellow_bed":             883,
+    "minecraft:lime_bed":               883,
+    "minecraft:pink_bed":               883,
+    "minecraft:gray_bed":               883,
+    "minecraft:light_gray_bed":         883,
+    "minecraft:cyan_bed":               885,
+    "minecraft:purple_bed":             884,
+    "minecraft:blue_bed":               885,
+    "minecraft:brown_bed":              883,
+    "minecraft:green_bed":              883,
+    "minecraft:red_bed":                884,
+    "minecraft:black_bed":              883,
 
-    # ── Tấm nửa (Slabs) ──────────────────────────────────────────────────────
-    "minecraft:oak_slab":                   514, # 514_Fruittreewoodstep
-    "minecraft:spruce_slab":                517, # 517_Redcedarstep
-    "minecraft:birch_slab":                 515, # 515_Larchstep
-    "minecraft:jungle_slab":                514,
-    "minecraft:acacia_slab":                518, # 518_Nanmustep
-    "minecraft:dark_oak_slab":              519, # 519_Walnutstep
-    "minecraft:mangrove_slab":              514,
-    "minecraft:cherry_slab":                514,
-    "minecraft:bamboo_slab":                514,
-    "minecraft:crimson_slab":                514,
-    "minecraft:warped_slab":                514,
-    "minecraft:stone_slab":                  506, # 506_stone_slab
-    "minecraft:smooth_stone_slab":          506,
-    "minecraft:cobblestone_slab":           509, # 509_Stonecubestep
-    "minecraft:stone_brick_slab":           511, # 511_Stonebrickstep
-    "minecraft:mossy_stone_brick_slab":     511,
-    "minecraft:andesite_slab":              506,
-    "minecraft:polished_andesite_slab":     506,
-    "minecraft:diorite_slab":               506,
-    "minecraft:polished_diorite_slab":      506,
-    "minecraft:granite_slab":               506,
-    "minecraft:polished_granite_slab":      506,
-    "minecraft:sandstone_slab":             507, # 507_Sandstonestep
-    "minecraft:cut_sandstone_slab":         507,
-    "minecraft:smooth_sandstone_slab":      507,
-    "minecraft:red_sandstone_slab":         507,
-    "minecraft:cut_red_sandstone_slab":     507,
-    "minecraft:smooth_red_sandstone_slab":  507,
-    "minecraft:brick_slab":                  510, # 510_Redbrickstep
-    "minecraft:nether_brick_slab":          512, # 512_Sulfurbrickstep
-    "minecraft:red_nether_brick_slab":      512,
-    "minecraft:quartz_slab":                506,
-    "minecraft:smooth_quartz_slab":         506,
-    "minecraft:purpur_slab":                112,
-    "minecraft:prismarine_slab":            506,
-    "minecraft:prismarine_brick_slab":      506,
-    "minecraft:dark_prismarine_slab":       506,
+    # ── Biển báo (Signs) ──────────────────────────────────────────────────
+    "minecraft:oak_sign":               892,    # 892_plaque
+    "minecraft:oak_wall_sign":          892,
+    "minecraft:birch_sign":             893,    # 893_plaque1
+    "minecraft:birch_wall_sign":        893,
+    "minecraft:spruce_sign":            894,    # 894_plaque2
+    "minecraft:spruce_wall_sign":       894,
+    "minecraft:jungle_sign":            895,    # 895_plaque3
+    "minecraft:jungle_wall_sign":       895,
+    "minecraft:acacia_sign":            897,    # 897_plaque5
+    "minecraft:acacia_wall_sign":       897,
+    "minecraft:dark_oak_sign":          896,    # 896_plaque4
+    "minecraft:dark_oak_wall_sign":     896,
+    "minecraft:mangrove_sign":          892,
+    "minecraft:mangrove_wall_sign":     892,
+    "minecraft:cherry_sign":            892,
+    "minecraft:cherry_wall_sign":       892,
+    "minecraft:bamboo_sign":            892,
+    "minecraft:bamboo_wall_sign":       892,
+    "minecraft:crimson_sign":           892,
+    "minecraft:crimson_wall_sign":      892,
+    "minecraft:warped_sign":            892,
+    "minecraft:warped_wall_sign":       892,
+    "minecraft:oak_hanging_sign":       892,
+    "minecraft:birch_hanging_sign":     893,
+    "minecraft:spruce_hanging_sign":    894,
+    "minecraft:jungle_hanging_sign":    895,
+    "minecraft:acacia_hanging_sign":    897,
+    "minecraft:dark_oak_hanging_sign":  896,
 
-    # ── Hàng rào (Fences) ────────────────────────────────────────────────────
-    "minecraft:oak_fence":                  534, # 534_Fence (hàng rào gỗ thường)
-    "minecraft:birch_fence":                553, # 553_fence_normalwood (hàng rào gỗ thường - loại khác)
-    "minecraft:spruce_fence":               539, # 539_fence_poplarwood (hàng rào gỗ dương)
-    "minecraft:jungle_fence":               534,
-    "minecraft:acacia_fence":               553,
-    "minecraft:dark_oak_fence":             539,
-    "minecraft:mangrove_fence":             534,
-    "minecraft:cherry_fence":               553,
-    "minecraft:bamboo_fence":               534,
-    "minecraft:crimson_fence":               683, # 683_dragonbrick (gạch địa ngục)
-    "minecraft:warped_fence":               683,
-    "minecraft:nether_brick_fence":         538, # 538_Sulfurbrickfence (hàng rào gạch lưu huỳnh)
-    "minecraft:iron_bars":                  526, # 526_Ironbar (song sắt)
-
-    # ── Cổng hàng rào (Fence Gates) ─────────────────────────────────────────
-    "minecraft:oak_fence_gate":             535, # 535_Fencegate
-    "minecraft:birch_fence_gate":           535,
-    "minecraft:spruce_fence_gate":          535,
-    "minecraft:jungle_fence_gate":          535,
-    "minecraft:acacia_fence_gate":          535,
-    "minecraft:dark_oak_fence_gate":        535,
-    "minecraft:mangrove_fence_gate":        535,
-    "minecraft:cherry_fence_gate":          535,
-    "minecraft:bamboo_fence_gate":          535,
-    "minecraft:crimson_fence_gate":         535,
-    "minecraft:warped_fence_gate":          535,
-
-    # ── Cửa (Doors) ─────────────────────────────────────────────────────────
-    "minecraft:oak_door":                   854, # 854_door_phoebe
-    "minecraft:birch_door":                 856, # 856_door_birch
-    "minecraft:spruce_door":                860, # 860_door_cathaya
-    "minecraft:jungle_door":                855, # 855_door_walnut
-    "minecraft:acacia_door":                854,
-    "minecraft:dark_oak_door":              858, # 858_door_redwood
-    "minecraft:mangrove_door":              854,
-    "minecraft:cherry_door":                854,
-    "minecraft:bamboo_door":                854,
-    "minecraft:crimson_door":               683,
-    "minecraft:warped_door":                683,
-    "minecraft:iron_door":                  857, # 857_door_gold
-
-    # ── Cửa sập (Trapdoors) ─────────────────────────────────────────────────
-    "minecraft:oak_trapdoor":               555, # 555_windows_wood (thay vì 813_Ladder)
-    "minecraft:birch_trapdoor":             555,
-    "minecraft:spruce_trapdoor":            555,
-    "minecraft:jungle_trapdoor":            555,
-    "minecraft:acacia_trapdoor":            555,
-    "minecraft:dark_oak_trapdoor":          555,
-    "minecraft:mangrove_trapdoor":          555,
-    "minecraft:cherry_trapdoor":            555,
-    "minecraft:bamboo_trapdoor":            555,
-    "minecraft:crimson_trapdoor":           555,
-    "minecraft:warped_trapdoor":            555,
-    "minecraft:iron_trapdoor":               526, # 526_Ironbar (song sắt)
-
-    # ── Giường (Beds) ────────────────────────────────────────────────────────
-    "minecraft:white_bed":                  883, # 883_bed1
-    "minecraft:orange_bed":                 883,
-    "minecraft:magenta_bed":                884, # 884_bed2
-    "minecraft:light_blue_bed":             885, # 885_bed3
-    "minecraft:yellow_bed":                 883,
-    "minecraft:lime_bed":                   883,
-    "minecraft:pink_bed":                   883,
-    "minecraft:gray_bed":                   883,
-    "minecraft:light_gray_bed":             883,
-    "minecraft:cyan_bed":                   885,
-    "minecraft:purple_bed":                 884,
-    "minecraft:blue_bed":                   885,
-    "minecraft:brown_bed":                   883,
-    "minecraft:green_bed":                   883,
-    "minecraft:red_bed":                     884,
-    "minecraft:black_bed":                   883,
-
-    # ── Biển báo (Signs) ────────────────────────────────────────────────────
-    "minecraft:oak_sign":                   892, # 892_plaque
-    "minecraft:oak_wall_sign":              892,
-    "minecraft:birch_sign":                 893, # 893_plaque1
-    "minecraft:birch_wall_sign":            893,
-    "minecraft:spruce_sign":                894, # 894_plaque2
-    "minecraft:spruce_wall_sign":           894,
-    "minecraft:jungle_sign":                895, # 895_plaque3
-    "minecraft:jungle_wall_sign":           895,
-    "minecraft:acacia_sign":                897, # 897_plaque5
-    "minecraft:acacia_wall_sign":           897,
-    "minecraft:dark_oak_sign":              896, # 896_plaque4
-    "minecraft:dark_oak_wall_sign":         896,
-    "minecraft:mangrove_sign":              892,
-    "minecraft:mangrove_wall_sign":         892,
-    "minecraft:cherry_sign":                892,
-    "minecraft:cherry_wall_sign":           892,
-    "minecraft:bamboo_sign":                 892,
-    "minecraft:bamboo_wall_sign":            892,
-    "minecraft:crimson_sign":               892,
-    "minecraft:crimson_wall_sign":          892,
-    "minecraft:warped_sign":                892,
-    "minecraft:warped_wall_sign":           892,
-
-    # ── Nút bấm & Áp lực (Buttons & Pressure Plates) ────────────────────────
-    "minecraft:stone_button":               364, # 364_newbutton_stone
-    "minecraft:oak_button":                 363, # 363_newbutton_wood
-    "minecraft:birch_button":               363,
-    "minecraft:spruce_button":              363,
-    "minecraft:jungle_button":              363,
-    "minecraft:acacia_button":              363,
-    "minecraft:dark_oak_button":            363,
-    "minecraft:mangrove_button":            363,
-    "minecraft:cherry_button":              363,
-    "minecraft:bamboo_button":              363,
-    "minecraft:crimson_button":             363,
-    "minecraft:warped_button":              363,
+    # ── Nút bấm & Áp lực (Buttons & Pressure Plates) ──────────────────────
+    "minecraft:stone_button":           364,    # 364_newbutton_stone
+    "minecraft:oak_button":             363,    # 363_newbutton_wood
+    "minecraft:birch_button":           363,
+    "minecraft:spruce_button":          363,
+    "minecraft:jungle_button":          363,
+    "minecraft:acacia_button":          363,
+    "minecraft:dark_oak_button":        363,
+    "minecraft:mangrove_button":        363,
+    "minecraft:cherry_button":          363,
+    "minecraft:bamboo_button":          363,
+    "minecraft:crimson_button":         363,
+    "minecraft:warped_button":          363,
     "minecraft:polished_blackstone_button": 364,
-
-    "minecraft:stone_pressure_plate":       360, # 360_new_pressure_stone
-    "minecraft:oak_pressure_plate":         359, # 359_new_pressure_wood
-    "minecraft:birch_pressure_plate":       359,
-    "minecraft:spruce_pressure_plate":      359,
-    "minecraft:jungle_pressure_plate":      359,
-    "minecraft:acacia_pressure_plate":      359,
-    "minecraft:dark_oak_pressure_plate":    359,
-    "minecraft:mangrove_pressure_plate":    359,
-    "minecraft:cherry_pressure_plate":      359,
-    "minecraft:bamboo_pressure_plate":      359,
-    "minecraft:crimson_pressure_plate":     359,
-    "minecraft:warped_pressure_plate":      359,
+    "minecraft:stone_pressure_plate":   360,    # 360_new_pressure_stone
+    "minecraft:oak_pressure_plate":     359,    # 359_new_pressure_wood
+    "minecraft:birch_pressure_plate":   359,
+    "minecraft:spruce_pressure_plate":  359,
+    "minecraft:jungle_pressure_plate":  359,
+    "minecraft:acacia_pressure_plate":  359,
+    "minecraft:dark_oak_pressure_plate":359,
+    "minecraft:mangrove_pressure_plate":359,
+    "minecraft:cherry_pressure_plate":  359,
+    "minecraft:bamboo_pressure_plate":  359,
+    "minecraft:crimson_pressure_plate": 359,
+    "minecraft:warped_pressure_plate":  359,
     "minecraft:polished_blackstone_pressure_plate": 360,
     "minecraft:light_weighted_pressure_plate": 360,
     "minecraft:heavy_weighted_pressure_plate": 360,
 
-    # ── Các khối đặc biệt khác (Other) ───────────────────────────────────────
-    "minecraft:bookshelf":                  820, # 820_Bookcase
-    "minecraft:chiseled_bookshelf":         820,
-    "minecraft:lectern":                    1143, # 1143_book_editortable
-    "minecraft:beehive":                    133, # 133_hive_empty
-    "minecraft:bee_nest":                   1019, # 1019_nest_block
-    "minecraft:honey_block":                558, # 558_honey_water
-    "minecraft:honeycomb_block":            134, # 134_hive_full
-    "minecraft:cake":                        831, # 831_cake
-    "minecraft:pumpkin":                    102,
-    "minecraft:carved_pumpkin":             102,
-    "minecraft:melon":                      230, # 230_giantbluefruit
-    "minecraft:dried_kelp_block":           822, # 822_hay_block
-    "minecraft:hay_block":                  822,
-    "minecraft:tnt":                         132,
-    "minecraft:fire":                       141, # 141_volcanoaltar_flame_on
-    "minecraft:soul_fire":                  141,
-    "minecraft:cobweb":                     232, # 232_vine
-    "minecraft:slime_block":                 412, # 412_silica_block
-    "minecraft:spawner":                    684, # 684_mobspawner2_on
-    "minecraft:dragon_egg":                 740, # 740_dragonegg_lava
-    "minecraft:turtle_egg":                  740,
-    "minecraft:sniffer_egg":                740,
-    "minecraft:sculk":                      104,
-    "minecraft:sculk_vein":                  232,
-    "minecraft:sculk_catalyst":             104,
-    "minecraft:sculk_shrieker":             104,
-    "minecraft:sculk_sensor":               104,
-    "minecraft:calibrated_sculk_sensor":    104,
-    "minecraft:reinforced_deepslate":       962,
-    "minecraft:command_block":               10,
-    "minecraft:chain_command_block":        10,
-    "minecraft:repeating_command_block":    10,
-    # ── Bổ sung từ Tool-Schematic-to-Lua ─────────────────────────────────────
-    "minecraft:mud_bricks":               421, # 421_adobe (gạch bùn)
-    "minecraft:mud_brick_stairs":         530, # 530_Redbrickstair (gần giống)
-    "minecraft:mud_brick_slab":           510, # 510_Redbrickstep
-    "minecraft:mud_brick_wall":           421, # 421_adobe (dùng khối)
-    "minecraft:decorated_pot":            737, # 737_jar1 (bình trang trí)
-    "minecraft:pitcher_plant":            313, # 313_rose (hoa)
-    "minecraft:torchflower":               302, # 302_starflower (hoa)
-    "minecraft:torchflower_crop":         229, # 229_corn (cây trồng)
-    "minecraft:frogspawn":                 247, # 247_flower_floating (trứng ếch)
-    "minecraft:oak_hanging_sign":         892, # 892_plaque
-    "minecraft:spruce_hanging_sign":      894, # 894_plaque2
-    "minecraft:birch_hanging_sign":       893, # 893_plaque1
-    "minecraft:jungle_hanging_sign":      895, # 895_plaque3
-    "minecraft:acacia_hanging_sign":      897, # 897_plaque5
-    "minecraft:dark_oak_hanging_sign":    896, # 896_plaque4
-    "minecraft:mangrove_hanging_sign":    892,
-    "minecraft:cherry_hanging_sign":      892,
-    "minecraft:bamboo_hanging_sign":      892,
-    "minecraft:crimson_hanging_sign":     892,
-    "minecraft:warped_hanging_sign":      892,
-    "minecraft:amethyst_block":           112, # 112_blackcrystal (tinh thể)
-    "minecraft:budding_amethyst":         112,
-    "minecraft:amethyst_cluster":         112,
-    "minecraft:large_amethyst_bud":       112,
-    "minecraft:medium_amethyst_bud":      112,
-    "minecraft:small_amethyst_bud":       112,
-    "minecraft:quartz_bricks":            108, # 108_SandStone (hoặc 501)
-    "minecraft:bamboo_mosaic":             251, # 251_bamboo_planks
-    "minecraft:bamboo_mosaic_stairs":     520,
-    "minecraft:bamboo_mosaic_slab":       514,
-    #stairs/slabs/walls cho deepslate ─────────────────────────────
-    "minecraft:cobbled_deepslate_stairs":     529, # 529_Stonecubestair
-    "minecraft:cobbled_deepslate_slab":       509, # 509_Stonecubestep
-    "minecraft:cobbled_deepslate_wall":       502, # 502_stonebrick_cracked (dùng đá cuội nứt)
-    "minecraft:polished_deepslate_stairs":    529, # 529_Stonecubestair (hoặc 531)
-    "minecraft:polished_deepslate_slab":      509, # 509_Stonecubestep
-    "minecraft:polished_deepslate_wall":      505, # 505_StoneBlock
-    "minecraft:deepslate_brick_stairs":       531, # 531_Stonebrickstair
-    "minecraft:deepslate_brick_slab":         511, # 511_Stonebrickstep
-    "minecraft:deepslate_brick_wall":         501, # 501_StoneBrick
-    "minecraft:deepslate_tile_stairs":        531, # 531_Stonebrickstair
-    "minecraft:deepslate_tile_slab":          511, # 511_Stonebrickstep
-    "minecraft:deepslate_tile_wall":          501, # 501_StoneBrick
-    # ── Bổ sung walls cho các loại đá phổ biến ───────────────────────────────
-    "minecraft:andesite_wall":                502,
-    "minecraft:diorite_wall":                 502,
-    "minecraft:granite_wall":                 502,
-    "minecraft:polished_andesite_wall":       505,
-    "minecraft:polished_diorite_wall":        505,
-    "minecraft:polished_granite_wall":        505,
-    "minecraft:stone_brick_wall":             501,
-    "minecraft:mossy_stone_brick_wall":       503,
-    "minecraft:brick_wall":                   547,
-    "minecraft:prismarine_wall":              502,
-    "minecraft:red_sandstone_wall":           108,
-    "minecraft:sandstone_wall":                108,
-    "minecraft:end_stone_brick_wall":         116,
-    "minecraft:nether_brick_wall":            683,
-    "minecraft:red_nether_brick_wall":        683,
-    "minecraft:blackstone_wall":               682,
-    "minecraft:polished_blackstone_wall":      505,
-    "minecraft:polished_blackstone_brick_wall": 501,
-
-    # ── Bổ sung stairs/slabs/walls cho blackstone và polished variants ───────
-    "minecraft:blackstone_stairs":             529,
-    "minecraft:blackstone_slab":               506,
-    "minecraft:polished_blackstone":           505,
-    "minecraft:polished_blackstone_stairs":    529,
-    "minecraft:polished_blackstone_slab":      506,
-    "minecraft:polished_blackstone_bricks":    501,
-    "minecraft:polished_blackstone_brick_stairs": 531,
-    "minecraft:polished_blackstone_brick_slab": 511,
-    "minecraft:polished_blackstone_brick_wall": 501,
-    "minecraft:chiseled_polished_blackstone":  504,
-
-    # ── Bổ sung copper cut variants ──────────────────────────────────────────
-    "minecraft:cut_copper":                    456,
-    "minecraft:cut_copper_stairs":             529,
-    "minecraft:cut_copper_slab":               506,
-    "minecraft:exposed_cut_copper":            456,
-    "minecraft:exposed_cut_copper_stairs":     529,
-    "minecraft:exposed_cut_copper_slab":       506,
-    "minecraft:weathered_cut_copper":          456,
-    "minecraft:weathered_cut_copper_stairs":   529,
-    "minecraft:weathered_cut_copper_slab":     506,
-    "minecraft:oxidized_cut_copper":           456,
-    "minecraft:oxidized_cut_copper_stairs":    529,
-    "minecraft:oxidized_cut_copper_slab":      506,
-    "minecraft:waxed_cut_copper":              456,
-    "minecraft:waxed_cut_copper_stairs":       529,
-    "minecraft:waxed_cut_copper_slab":         506,
-    "minecraft:waxed_exposed_cut_copper":      456,
-    "minecraft:waxed_exposed_cut_copper_stairs": 529,
-    "minecraft:waxed_exposed_cut_copper_slab": 506,
-    "minecraft:waxed_weathered_cut_copper":    456,
-    "minecraft:waxed_weathered_cut_copper_stairs": 529,
-    "minecraft:waxed_weathered_cut_copper_slab": 506,
-    "minecraft:waxed_oxidized_cut_copper":     456,
-    "minecraft:waxed_oxidized_cut_copper_stairs": 529,
-    "minecraft:waxed_oxidized_cut_copper_slab": 506,
-
-    # ── Bổ sung copper door và trapdoor ─────────────────────────────────────
-    "minecraft:copper_door":                   857,
-    "minecraft:exposed_copper_door":           857,
-    "minecraft:weathered_copper_door":         857,
-    "minecraft:oxidized_copper_door":          857,
-    "minecraft:waxed_copper_door":             857,
-    "minecraft:waxed_exposed_copper_door":     857,
-    "minecraft:waxed_weathered_copper_door":   857,
-    "minecraft:waxed_oxidized_copper_door":    857,
-    "minecraft:copper_trapdoor":               526,
-    "minecraft:exposed_copper_trapdoor":       526,
-    "minecraft:weathered_copper_trapdoor":     526,
-    "minecraft:oxidized_copper_trapdoor":      526,
-    "minecraft:waxed_copper_trapdoor":         526,
-    "minecraft:waxed_exposed_copper_trapdoor": 526,
-    "minecraft:waxed_weathered_copper_trapdoor": 526,
-    "minecraft:waxed_oxidized_copper_trapdoor": 526,
-
-    # ── Bổ sung tuff variants (1.21) ────────────────────────────────────────
-    "minecraft:tuff_stairs":                    529,
-    "minecraft:tuff_slab":                      506,
-    "minecraft:tuff_wall":                      502,
-    "minecraft:polished_tuff":                  505,
-    "minecraft:polished_tuff_stairs":           529,
-    "minecraft:polished_tuff_slab":             506,
-    "minecraft:polished_tuff_wall":             505,
-    "minecraft:tuff_bricks":                     501,
-    "minecraft:tuff_brick_stairs":               531,
-    "minecraft:tuff_brick_slab":                 511,
-    "minecraft:tuff_brick_wall":                 501,
-    "minecraft:chiseled_tuff":                   504,
-    "minecraft:chiseled_tuff_bricks":            504,
-
-    # ── Bổ sung cherry sapling ──────────────────────────────────────────────
-    "minecraft:cherry_sapling":                 300,
-
-    # ── Bổ sung glazed terracotta (các màu) ─────────────────────────────────
-    "minecraft:white_glazed_terracotta":        425,
-    "minecraft:orange_glazed_terracotta":       426,
-    "minecraft:magenta_glazed_terracotta":      427,
-    "minecraft:light_blue_glazed_terracotta":   428,
-    "minecraft:yellow_glazed_terracotta":       429,
-    "minecraft:lime_glazed_terracotta":         425,
-    "minecraft:pink_glazed_terracotta":         426,
-    "minecraft:gray_glazed_terracotta":         427,
-    "minecraft:light_gray_glazed_terracotta":   428,
-    "minecraft:cyan_glazed_terracotta":         429,
-    "minecraft:purple_glazed_terracotta":       425,
-    "minecraft:blue_glazed_terracotta":         426,
-    "minecraft:brown_glazed_terracotta":        427,
-    "minecraft:green_glazed_terracotta":        428,
-    "minecraft:red_glazed_terracotta":          429,
-    "minecraft:black_glazed_terracotta":        425,
-
-    # ── Bổ sung nến (candle) ────────────────────────────────────────────────
-    "minecraft:candle":                         931,
-    "minecraft:white_candle":                   931,
-    "minecraft:orange_candle":                  931,
-    "minecraft:magenta_candle":                 931,
-    "minecraft:light_blue_candle":              931,
-    "minecraft:yellow_candle":                  931,
-    "minecraft:lime_candle":                    931,
-    "minecraft:pink_candle":                    931,
-    "minecraft:gray_candle":                    931,
-    "minecraft:light_gray_candle":              931,
-    "minecraft:cyan_candle":                    931,
-    "minecraft:purple_candle":                  931,
-    "minecraft:blue_candle":                    931,
-    "minecraft:brown_candle":                    931,
-    "minecraft:green_candle":                    931,
-    "minecraft:red_candle":                      931,
-    "minecraft:black_candle":                    931,
-
-    # ── Bổ sung các block lẻ tẻ khác ────────────────────────────────────────
-    "minecraft:end_rod":                         934,
-    "minecraft:lightning_rod":                   526,
-    "minecraft:daylight_detector":               731,
-    "minecraft:hopper":                          802,
-    "minecraft:observer":                        505,
-    "minecraft:piston_head":                      505,
-    "minecraft:moving_piston":                    505,
-    "minecraft:redstone_torch":                   934,
-    "minecraft:redstone_wall_torch":              934,
-    "minecraft:repeater":                         360,
-    "minecraft:comparator":                       360,
-    "minecraft:lever":                            363,
-    "minecraft:bell":                             931,
-
-    "minecraft:froglight":                        550,
-    "minecraft:ochre_froglight":                  550,
-    "minecraft:verdant_froglight":                550,
-    "minecraft:pearlescent_froglight":            550,
-
-    "minecraft:mangrove_roots":                   232,
-    "minecraft:muddy_mangrove_roots":             421,
-
-    "minecraft:suspicious_sand":                  109,
-    "minecraft:suspicious_gravel":                107,
-
-    "minecraft:crafter":                          802,
-    "minecraft:trial_spawner":                    684,
-    "minecraft:vault":                            1180,
-    "minecraft:heavy_core":                       962,
-    # ── Bổ sung các block còn thiếu ─────────────────────────────────────────
-    "minecraft:smooth_quartz":             540, # 540_Smoothsandstone (dùng smooth sandstone)
-    "minecraft:smooth_quartz_slab":        506, # 506_stone_slab (hoặc 507)
-    "minecraft:smooth_quartz_stairs":      529, # 529_Stonecubestair
-    "minecraft:nether_wart":               227, # 227_zisuguo (cây trồng)
-    "minecraft:warped_wart":               227, # 227_zisuguo
-    "minecraft:flower_pot":                737, # 737_jar1 (bình gốm)
-    "minecraft:target":                    822, # 822_hay_block (bia tập bắn)
-    "minecraft:respawn_anchor":            140, # 140_volcanoaltar_earth_on (khối địa ngục)
-    "minecraft:lodestone":                 410, # 410_flamecrystal_block (tinh thể)
-    "minecraft:chain":                     526, # 526_Ironbar (dây xích)
-    "minecraft:rail":                      813, # 813_Ladder (tạm dùng thang)
-    "minecraft:powered_rail":               813,
-    "minecraft:detector_rail":             813,
-    "minecraft:activator_rail":            813,
-    "minecraft:redstone_wire":              None, # bỏ qua vì không tương thích
-    # ── Bổ sung các block còn thiếu từ log lỗi ───────────────────────────────
-    "minecraft:quartz_block":               540, # 540_Smoothsandstone (khối quartz trắng mịn) [citation:9][citation:10]
-    "minecraft:quartz_pillar":               540, # 540_Smoothsandstone (dùng smooth sandstone cho cột) [citation:1]
-    "minecraft:chiseled_quartz_block":      540, # 540_Smoothsandstone (khối chạm khắc) [citation:4]
-    "minecraft:smooth_quartz":               540, # 540_Smoothsandstone (quartz mịn)
-    "minecraft:quartz_bricks":               540, # 540_Smoothsandstone (gạch quartz)
-    "minecraft:short_grass":                 224, # 224_tallgrass (cỏ ngắn) [citation:3]
-    "minecraft:bone_block":                  447, # 447_mysterious_fossil (khối xương hóa thạch) [citation:5]
-    "minecraft:potted_dead_bush":            737, # 737_jar1 (bình gốm trồng cây khô) [citation:6]
-    "minecraft:lily_pad":                    247, # 247_flower_floating (lá sen nổi) [citation:7]
-    "minecraft:nether_portal":               132, # 132_hotcrystal (khung cổng địa ngục màu tím) [citation:8]
-        # ── Bổ sung các block còn thiếu từ log lỗi (bản cập nhật 3) ───────────────
-    # Stairs & Walls từ đá có rêu
-    "minecraft:mossy_cobblestone_stairs":   530, # 530_Redbrickstair - cầu thang đá rêu
-    "minecraft:mossy_cobblestone_slab":     510, # 510_Redbrickstep - phiến đá rêu
-    "minecraft:mossy_cobblestone_wall":     503, # 503_MossyStoneBrick - tường đá rêu
-    "minecraft:cobblestone_wall":           502, # 502_stonebrick_cracked - tường đá cuội
-    
-    # Hoa cánh hồng (Pink Petals)
-    "minecraft:pink_petals":                 313, # 313_rose - hoa hồng (màu hồng)
-    
-    # Dây bẫy (Tripwire)
-    "minecraft:tripwire":                    232, # 232_vine - dây leo (dùng làm dây bẫy)
-    
-    # Thang (Ladder) - mặc dù đã có trong block map nhưng log báo thiếu
-    "minecraft:ladder":                      813, # 813_Ladder
-    
-    # Đèn đồng (Copper Bulb) - các biến thể
-    "minecraft:copper_bulb":                 861, # 861_glowstone_lamp_wood - đèn đá đỏ
-    "minecraft:exposed_copper_bulb":         861,
-    "minecraft:weathered_copper_bulb":       861,
-    "minecraft:oxidized_copper_bulb":        861,
-    "minecraft:waxed_copper_bulb":           861,
-    "minecraft:waxed_exposed_copper_bulb":   861,
-    "minecraft:waxed_weathered_copper_bulb": 861,
-    "minecraft:waxed_oxidized_copper_bulb":  861,
-    
-    # Banner treo tường (Wall Banners)
-    "minecraft:white_wall_banner":           925, # 925_flag0 - cờ trắng
-    "minecraft:orange_wall_banner":          919, # 919_flag1 - cờ cam
-    "minecraft:magenta_wall_banner":         920, # 920_flag2 - cờ đỏ tía
-    "minecraft:light_blue_wall_banner":      921, # 921_flag3 - cờ xanh nhạt
-    "minecraft:yellow_wall_banner":          922, # 922_flag4 - cờ vàng
-    "minecraft:lime_wall_banner":            923, # 923_flag5 - cờ xanh vôi
-    "minecraft:pink_wall_banner":            924, # 924_flag6 - cờ hồng
-    "minecraft:gray_wall_banner":            925, # 925_flag0 (dùng lại)
-    "minecraft:light_gray_wall_banner":      925,
-    "minecraft:cyan_wall_banner":            919,
-    "minecraft:purple_wall_banner":          920,
-    "minecraft:blue_wall_banner":            921,
-    "minecraft:brown_wall_banner":           922,
-    "minecraft:green_wall_banner":           923,
-    "minecraft:red_wall_banner":             924,
-    "minecraft:black_wall_banner":           925,
-    
-    # Mầm tre (Bamboo Sapling)
-    "minecraft:bamboo_sapling":              253, # 253_bamboo_shoot - măng tre
+    # ── Khối trang trí & lặt vặt khác ─────────────────────────────────────
+    "minecraft:cake":                   831,    # 831_cake
+    "minecraft:pumpkin":                102,    # 102_arableland (tạm)
+    "minecraft:carved_pumpkin":         102,
+    "minecraft:melon":                  230,    # 230_giantbluefruit (dưa xanh)
+    "minecraft:dried_kelp_block":       822,    # 822_hay_block
+    "minecraft:hay_block":              822,
+    "minecraft:tnt":                    132,
+    "minecraft:fire":                   141,    # 141_volcanoaltar_flame_on
+    "minecraft:soul_fire":              141,
+    "minecraft:cobweb":                 232,
+    "minecraft:slime_block":            412,
+    "minecraft:spawner":                684,    # 684_mobspawner2_on
+    "minecraft:dragon_egg":             740,    # 740_dragonegg_lava
+    "minecraft:turtle_egg":             740,
+    "minecraft:sniffer_egg":            740,
+    "minecraft:frogspawn":              247,
+    "minecraft:sculk":                  104,
+    "minecraft:sculk_vein":             232,
+    "minecraft:sculk_catalyst":         104,
+    "minecraft:sculk_shrieker":         104,
+    "minecraft:sculk_sensor":           104,
+    "minecraft:calibrated_sculk_sensor":104,
+    "minecraft:reinforced_deepslate":   962,
+    "minecraft:command_block":          10,     # 10_starenergy_block
+    "minecraft:chain_command_block":    10,
+    "minecraft:repeating_command_block":10,
+    "minecraft:structure_block":        10,
+    "minecraft:jigsaw":                 10,
+    "minecraft:lightning_rod":          526,
+    "minecraft:amethyst_block":         112,
+    "minecraft:budding_amethyst":       112,
+    "minecraft:amethyst_cluster":       112,
+    "minecraft:large_amethyst_bud":     112,
+    "minecraft:medium_amethyst_bud":    112,
+    "minecraft:small_amethyst_bud":     112,
+    "minecraft:decorated_pot":          737,
+    "minecraft:flower_pot":             737,
+    "minecraft:tripwire":               232,
+    "minecraft:tripwire_hook":          364,
+    "minecraft:lily_pad":               247,
+    "minecraft:big_dripleaf_stem":      247,
+    "minecraft:cactus_flower":          313,
+    "minecraft:closed_eyeblossom":      301,
+    "minecraft:resin_block":            134,
+        # ── Bổ sung từ log lỗi ────────────────────────────────────────────────
+    "minecraft:scaffolding":                813,   # 813_Ladder (thang, tạm thay giàn giáo)
+    "minecraft:rail":                       None,  # Mini World không có ray, bỏ qua
+    "minecraft:mossy_cobblestone_slab":     511,   # 511_Stonebrickstep (phiến đá gạch)
+    "minecraft:smooth_stone":               505,   # 505_StoneBlock (đá nhẵn)
+    "minecraft:yellow_candle":              931,   # 931_candlestick (đế nến vàng)
+    "minecraft:light_gray_candle":          931,   # đế nến xám nhạt
+    "minecraft:gray_candle":                931,   # đế nến xám
+    "minecraft:red_candle":                 931,   # đế nến đỏ
+    "minecraft:brown_candle":               931,   # đế nến nâu
+    "minecraft:potted_dead_bush":           737,   # 737_jar1 (bình gốm trồng cây khô)
+    "minecraft:potted_blue_orchid":         737,   # bình gốm trồng lan xanh
+    "minecraft:potted_oak_sapling":         737,   # bình gốm trồng cây sồi non
+    "minecraft:potted_dark_oak_sapling":    737,   # bình gốm trồng sồi đen
+    "minecraft:potted_flowering_azalea_bush":737,  # bình gốm trồng hoa đỗ quyên
+    "minecraft:green_wall_banner":          923,   # 923_flag5 (cờ xanh lá)
+    "minecraft:white_wall_banner":          925,   # 925_flag0 (cờ trắng)
+    "minecraft:yellow_wall_banner":         922,   # 922_flag4 (cờ vàng)
+    "minecraft:waxed_oxidized_cut_copper_slab":    506,   # phiến đồng bị oxy hóa (dùng slab đá)
+    "minecraft:waxed_weathered_cut_copper_stairs": 529,   # cầu thang đồng phong hóa (dùng stair đá)
+    "minecraft:waxed_oxidized_cut_copper":         456,   # khối đồng oxy hóa
+    "minecraft:waxed_oxidized_cut_copper_stairs":  529,
+    "minecraft:waxed_oxidized_copper":             456,
+    "minecraft:waxed_weathered_cut_copper":        456,
+    "minecraft:waxed_weathered_cut_copper_slab":   506,
+    "minecraft:waxed_weathered_copper":            456,
+    "minecraft:waxed_exposed_cut_copper_stairs":   529,
+    "minecraft:waxed_exposed_cut_copper_slab":     506,
+    "minecraft:waxed_exposed_copper":              456,
+    "minecraft:waxed_cut_copper_stairs":           529,
+    "minecraft:waxed_cut_copper_slab":             506,
+    "minecraft:ladder":                        813,   # 813_Ladder (thang)
 }
 
 DEFAULT_ID = None
 
 
 def minecraft_name_to_miniworld_id(mc_name: str) -> int | None:
-
+    """
+    Chuyển đổi tên block Minecraft (có hoặc không có namespace)
+    sang ID Mini World. Trả về None nếu là block rỗng (air).
+    """
     name = mc_name.strip().lower()
 
+    # Chuẩn hoá namespace
     if ':' not in name:
         name = "minecraft:" + name
 
+    # Tra cứu trực tiếp
     if name in BLOCK_MAP:
         return BLOCK_MAP[name]
 
+    # Fallback: bỏ namespace rồi tìm lại
     bare = name.split(':', 1)[1]
     full_fallback = "minecraft:" + bare
     if full_fallback in BLOCK_MAP:
         return BLOCK_MAP[full_fallback]
 
+    # Không tìm thấy → dùng mặc định
     print(f"  [MAP?] Không tìm thấy: {name} → dùng id mặc định {DEFAULT_ID}")
     return DEFAULT_ID
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  2. LOGIC HƯỚNG (DIRECTION)
+# ══════════════════════════════════════════════════════════════════════════════
 
 FACING_TO_DIRECTION = {
     "north": 3,
@@ -1250,6 +1117,7 @@ FACING_TO_DIRECTION = {
     "up": 5,   # Hướng lên
 }
 
+# SỬA LỖI Ở ĐÂY: Trục Y (trên/xuống) của Mini World thường có data là 0
 AXIS_TO_DIRECTION = {
     "x": 1, # Nằm ngang trục X
     "y": 0, # Hướng đứng (trên/xuống) 
@@ -1257,7 +1125,10 @@ AXIS_TO_DIRECTION = {
 }
 
 def parse_block_state(block_state_str: str) -> tuple[str, dict]:
-
+    """
+    Phân tích chuỗi block state:
+    "minecraft:oak_stairs[facing=north,half=bottom]" → ("minecraft:oak_stairs", {"facing":"north",...})
+    """
     match = re.match(r'^([^\[]+)(?:\[([^\]]*)\])?$', block_state_str.strip())
     if not match:
         return block_state_str.strip(), {}
@@ -1274,14 +1145,18 @@ def parse_block_state(block_state_str: str) -> tuple[str, dict]:
 
 
 def get_direction(props: dict) -> int:
+    """Chuyển đổi properties Minecraft → direction Mini World."""
     dir_val = 0
     
+    # 1. Xử lý block có hướng mặt (facing)
     if "facing" in props:
         dir_val = FACING_TO_DIRECTION.get(props["facing"].lower(), 0)
     
+    # 2. Xử lý block dạng cột/trục (axis) như thân gỗ, cột thạch anh
     elif "axis" in props:
         return AXIS_TO_DIRECTION.get(props["axis"].lower(), 0)
         
+    # 3. SỬA LỖI Ở ĐÂY: Xử lý cầu thang/phiến đá lật ngược (nửa trên)
     # Trong Mini World, các block lật ngược thường cộng thêm 4 (hoặc 8 tùy block) vào data
     if "half" in props and props["half"] == "top":
         dir_val += 4
@@ -1290,22 +1165,36 @@ def get_direction(props: dict) -> int:
         
     return dir_val
 
+# ══════════════════════════════════════════════════════════════════════════════
+#  3. MINECRAFT LEGACY DATA VALUE → DIRECTION (cho .schematic cũ)
+# ══════════════════════════════════════════════════════════════════════════════
+
 def legacy_data_to_direction(block_id: int, data_value: int) -> int:
+    """Chuyển đổi metadata Minecraft (.schematic cũ) → direction Mini World."""
+    # Logs (block_id 17): bits 2-3 là trục
     if block_id == 17:
         axis = (data_value >> 2) & 0x3
         return [1, 5, 3, 0][axis % 4]
+    # Stairs
     STAIR_IDS = {53,67,108,109,114,128,134,135,136,163,164,180,203}
     if block_id in STAIR_IDS:
         return {0: 5, 1: 4, 2: 3, 3: 2}.get(data_value & 0x3, 0)
+    # Doors
     DOOR_IDS = {64, 71, 193, 194, 195, 196, 197}
     if block_id in DOOR_IDS:
         return {0: 3, 1: 4, 2: 2, 3: 5}.get(data_value & 0x3, 0)
+    # Furnace, Dispenser
     if block_id in {23, 61, 62, 158}:
         return {2: 3, 3: 2, 4: 4, 5: 5}.get(data_value & 0x7, 0)
     return 0
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+#  4. ĐỌC FILE NBT – DEEP SCAN ĐỆ QUY
+# ══════════════════════════════════════════════════════════════════════════════
+
 def deep_scan(nbt_data, target_key: str):
+    """Tìm kiếm đệ quy trong cây NBT. Trả về giá trị đầu tiên tìm thấy."""
     if isinstance(nbt_data, (dict, nbtlib.Compound)):
         for key, value in nbt_data.items():
             if key == target_key:
@@ -1322,6 +1211,9 @@ def deep_scan(nbt_data, target_key: str):
 
 
 def decode_varint_array(data: bytes) -> list[int]:
+    """Giải mã mảng VarInt từ bytes (SpongeSchematic v2/v3).
+    Sponge dùng unsigned VarInt thông thường, KHÔNG dùng zigzag encoding.
+    """
     result = []
     i = 0
     while i < len(data):
@@ -1336,16 +1228,17 @@ def decode_varint_array(data: bytes) -> list[int]:
             shift += 7
             if not (byte & 0x80):
                 break
-        if value & 1:
-            value = -(value >> 1) - 1
-        else:
-            value = value >> 1
+        # KHÔNG dùng zigzag - Sponge VarInt là unsigned
         result.append(value)
     return result
 
 
-class BlockEntry:
+# ══════════════════════════════════════════════════════════════════════════════
+#  5. PARSER CHO TỪNG ĐỊNH DẠNG FILE
+# ══════════════════════════════════════════════════════════════════════════════
 
+class BlockEntry:
+    """Đại diện cho một khối trong công trình."""
     __slots__ = ('x', 'y', 'z', 'miniworld_id', 'direction')
 
     def __init__(self, x: int, y: int, z: int, miniworld_id: int, direction: int = 0):
@@ -1373,7 +1266,10 @@ def _dump_nbt_keys(nbt_data, prefix="", depth=0, max_depth=4):
 
 
 def _extract_palette_and_data(nbt_file):
-
+    """
+    Trích xuất Palette và BlockData từ file SpongeSchematic (v1/v2/v3).
+    Trả về (palette_tag, block_data_tag, width, height, length)
+    """
     w = deep_scan(nbt_file, "Width")
     h = deep_scan(nbt_file, "Height")
     l = deep_scan(nbt_file, "Length")
@@ -1504,27 +1400,59 @@ def parse_schem(file_path: str) -> tuple[list[BlockEntry], dict]:
 
 
 def parse_schematic(file_path: str) -> tuple[list[BlockEntry], dict]:
-    """Đọc file .schematic (MCEdit – Minecraft 1.12 trở xuống)."""
+    """Đọc file .schematic (MCEdit – Minecraft 1.12 trở xuống).
+    Hỗ trợ cả thẻ 'Blocks', 'BlockArray', và thử fallback sang parse_schem nếu là Sponge format.
+    """
     print(f"[INFO] Đang đọc file .schematic (định dạng cũ): {file_path}")
     nbt_file = nbtlib.load(file_path)
+
+    # Debug: in cấu trúc để biết thẻ nào có
+    print("[INFO] Cấu trúc NBT (3 cấp):")
+    _dump_nbt_keys(nbt_file, max_depth=3)
 
     width   = deep_scan(nbt_file, "Width")
     height  = deep_scan(nbt_file, "Height")
     length  = deep_scan(nbt_file, "Length")
-    blocks_tag = deep_scan(nbt_file, "Blocks") or deep_scan(nbt_file, "BlockArray")
-    data_tag   = deep_scan(nbt_file, "Data")
+
+    # Thử nhiều tên thẻ có thể chứa block data
+    blocks_tag = None
+    found_key = None
+    for key in ("Blocks", "BlockArray", "blocks", "block_data"):
+        val = deep_scan(nbt_file, key)
+        if val is not None:
+            blocks_tag = val
+            found_key = key
+            print(f"[INFO] Tìm thấy block data tại thẻ '{key}' (kiểu: {type(val).__name__})")
+            break
+
+    data_tag = deep_scan(nbt_file, "Data") or deep_scan(nbt_file, "data")
 
     if width is None or height is None or length is None:
         raise ValueError("Không tìm thấy Width/Height/Length trong file .schematic")
     if blocks_tag is None:
-        raise ValueError("Không tìm thấy Blocks/BlockArray trong file .schematic")
+        # Kiểm tra xem có phải Sponge Schematic không (có thẻ Palette)
+        has_palette = deep_scan(nbt_file, "Palette") is not None
+        has_blockdata = deep_scan(nbt_file, "BlockData") is not None
+        if has_palette and has_blockdata:
+            print("[INFO] Phát hiện định dạng Sponge Schematic (.schem) trong file .schematic → chuyển parser")
+            return parse_schem(file_path)
+        raise ValueError(
+            "Không tìm thấy Blocks/BlockArray trong file .schematic\n"
+            "Gợi ý: File này có thể là Sponge Schematic – hãy đổi đuôi thành .schem rồi thử lại."
+        )
 
     W = int(width); H = int(height); L = int(length)
     print(f"[INFO] Kích thước: {W} x {H} x {L}")
 
-    block_ids = list(blocks_tag)
-    data_vals = list(data_tag) if data_tag is not None else [0] * len(block_ids)
+    # Chuyển blocks_tag về list an toàn
+    try:
+        block_ids = [int(b) & 0xFF for b in blocks_tag]
+    except Exception as ex:
+        raise ValueError(f"Không thể đọc dữ liệu block từ thẻ '{found_key}': {ex}")
 
+    data_vals = [int(d) & 0xFF for d in data_tag] if data_tag is not None else [0] * len(block_ids)
+
+    # Ánh xạ ID số Minecraft cũ → tên block có namespace
     LEGACY_ID_MAP = {
         0: None,
         1: "minecraft:stone",            2: "minecraft:grass_block",
@@ -1588,52 +1516,6 @@ def parse_schematic(file_path: str) -> tuple[list[BlockEntry], dict]:
         192: "minecraft:acacia_fence",   193: "minecraft:spruce_door",
         194: "minecraft:birch_door",     195: "minecraft:jungle_door",
         196: "minecraft:acacia_door",    197: "minecraft:dark_oak_door",
-            # ── Bổ sung các block còn thiếu từ log lỗi (bản cập nhật 3) ───────────────
-    # Stairs & Walls từ đá có rêu
-    "minecraft:mossy_cobblestone_stairs":   530, # 530_Redbrickstair - cầu thang đá rêu
-    "minecraft:mossy_cobblestone_slab":     510, # 510_Redbrickstep - phiến đá rêu
-    "minecraft:mossy_cobblestone_wall":     503, # 503_MossyStoneBrick - tường đá rêu
-    "minecraft:cobblestone_wall":           502, # 502_stonebrick_cracked - tường đá cuội
-    
-    # Hoa cánh hồng (Pink Petals)
-    "minecraft:pink_petals":                 313, # 313_rose - hoa hồng (màu hồng)
-    
-    # Dây bẫy (Tripwire)
-    "minecraft:tripwire":                    232, # 232_vine - dây leo (dùng làm dây bẫy)
-    
-    # Thang (Ladder) - mặc dù đã có trong block map nhưng log báo thiếu
-    "minecraft:ladder":                      813, # 813_Ladder
-    
-    # Đèn đồng (Copper Bulb) - các biến thể
-    "minecraft:copper_bulb":                 861, # 861_glowstone_lamp_wood - đèn đá đỏ
-    "minecraft:exposed_copper_bulb":         861,
-    "minecraft:weathered_copper_bulb":       861,
-    "minecraft:oxidized_copper_bulb":        861,
-    "minecraft:waxed_copper_bulb":           861,
-    "minecraft:waxed_exposed_copper_bulb":   861,
-    "minecraft:waxed_weathered_copper_bulb": 861,
-    "minecraft:waxed_oxidized_copper_bulb":  861,
-    
-    # Banner treo tường (Wall Banners)
-    "minecraft:white_wall_banner":           925, # 925_flag0 - cờ trắng
-    "minecraft:orange_wall_banner":          919, # 919_flag1 - cờ cam
-    "minecraft:magenta_wall_banner":         920, # 920_flag2 - cờ đỏ tía
-    "minecraft:light_blue_wall_banner":      921, # 921_flag3 - cờ xanh nhạt
-    "minecraft:yellow_wall_banner":          922, # 922_flag4 - cờ vàng
-    "minecraft:lime_wall_banner":            923, # 923_flag5 - cờ xanh vôi
-    "minecraft:pink_wall_banner":            924, # 924_flag6 - cờ hồng
-    "minecraft:gray_wall_banner":            925, # 925_flag0 (dùng lại)
-    "minecraft:light_gray_wall_banner":      925,
-    "minecraft:cyan_wall_banner":            919,
-    "minecraft:purple_wall_banner":          920,
-    "minecraft:blue_wall_banner":            921,
-    "minecraft:brown_wall_banner":           922,
-    "minecraft:green_wall_banner":           923,
-    "minecraft:red_wall_banner":             924,
-    "minecraft:black_wall_banner":           925,
-    
-    # Mầm tre (Bamboo Sapling)
-    "minecraft:bamboo_sapling":              253, # 253_bamboo_shoot - măng tre
     }
 
     blocks = []
@@ -1849,23 +1731,29 @@ def parse_mcstructure(file_path: str) -> tuple[list[BlockEntry], dict]:
         base_name = str(block_item.get("name", "minecraft:air"))
         states = block_item.get("states", {})
         props = {}
+
+        # ─── BẮT ĐẦU FIX HƯỚNG BEDROCK SANG JAVA ───
         
+        # 1. Cầu thang (Stairs) trong Bedrock dùng "weirdo_direction"
         if "weirdo_direction" in states:
             bedrock_weirdo = int(states["weirdo_direction"])
             # 0: East, 1: West, 2: South, 3: North
             weirdo_map = {0: "east", 1: "west", 2: "south", 3: "north"}
             props["facing"] = weirdo_map.get(bedrock_weirdo, "east")
             
+        # 2. Block có hướng nói chung (Lò nung, Rương, Máy phân phát...)
         elif "facing_direction" in states:
             bedrock_facing = int(states["facing_direction"])
             facing_map = {0: "down", 1: "up", 2: "north", 3: "south", 4: "west", 5: "east"}
             props["facing"] = facing_map.get(bedrock_facing, "north")
             
+        # 3. Cửa, Giường, Cửa sập (Doors, Trapdoors, Beds...)
         elif "direction" in states:
             bedrock_dir = int(states["direction"])
             dir_map = {0: "south", 1: "west", 2: "north", 3: "east"}
             props["facing"] = dir_map.get(bedrock_dir, "south")
             
+        # 4. Đuốc (Torches)
         elif "torch_facing_direction" in states:
             t_facing = str(states["torch_facing_direction"])
             if t_facing == "top":
@@ -1873,14 +1761,19 @@ def parse_mcstructure(file_path: str) -> tuple[list[BlockEntry], dict]:
             elif t_facing != "unknown":
                 props["facing"] = t_facing
 
+        # 5. Gỗ, Cột thạch anh (Pillars / Logs)
         if "pillar_axis" in states:
             props["axis"] = str(states["pillar_axis"]).lower()
             
+        # 6. Cầu thang úp ngược, Cửa sập mở, Phiến đá nửa trên
         if "upside_down_bit" in states and states["upside_down_bit"]:
             props["half"] = "top"
         if "top_slot_bit" in states and states["top_slot_bit"]:
             props["type"] = "top"
 
+        # ─── KẾT THÚC FIX HƯỚNG ───
+
+        # Tái sử dụng hàm chuyển đổi ID và tính Direction Mini World
         mid = minecraft_name_to_miniworld_id(base_name)
         direction = get_direction(props)
         palette_lookup[idx] = (mid, direction)
@@ -1983,107 +1876,203 @@ def parse_structure_nbt(file_path: str) -> tuple[list[BlockEntry], dict]:
     print(f"[OK] Đã đọc {len(blocks)} khối từ structure .nbt")
     return blocks, meta
 
+# ══════════════════════════════════════════════════════════════════════════════
+#  6. SINH LUA SCRIPT
+# ══════════════════════════════════════════════════════════════════════════════
 
 def generate_lua_script(blocks: list[BlockEntry], meta: dict, output_path: str):
     """
     Sinh file Lua từ danh sách BlockEntry.
+    Dùng Game.RunTime tick-based (học từ builder.lua) để tránh timeout.
+    Mỗi tick xử lý SPEED block, không làm treo game.
     API Mini World: Block:setBlockAll(x, y, z, id, dir)
-    Tự động chia thành N bảng, mỗi bảng tối đa MAX_TABLE_SIZE phần tử.
     """
-    MAX_TABLE_SIZE = 260000  # Giới hạn phần tử mỗi bảng
     total = len(blocks)
-    print(f"[INFO] Đang sinh Lua script cho {total} khối...")
+    print(f"[INFO] Đang sinh Lua script cho {total} khối (tick-based)...")
 
-    # Chia blocks thành các phần, mỗi phần tối đa MAX_TABLE_SIZE
-    num_tables = max(1, -(-total // MAX_TABLE_SIZE))  # ceiling division
-    parts = []
-    for i in range(num_tables):
-        start = i * MAX_TABLE_SIZE
-        end = min(start + MAX_TABLE_SIZE, total)
-        parts.append(blocks[start:end])
+    # Thống kê block bị skip (mid=None)
+    skipped = sum(1 for b in blocks if b.miniworld_id is None)
+    valid_blocks = [b for b in blocks if b.miniworld_id is not None]
+    actual_total = len(valid_blocks)
+    if skipped > 0:
+        print(f"[CẢNH BÁO] {skipped} block bị bỏ qua (không có trong BLOCK_MAP)")
+    print(f"[INFO] Sẽ xuất {actual_total} block hợp lệ")
 
-    print(f"[INFO] Chia thanh {num_tables} bang (moi bang toi da {MAX_TABLE_SIZE} phan tu)")
+    # Chia thành tối đa 10 bảng, mỗi bảng 260000 block (tổng tối đa 2,600,000 block)
+    CHUNK_SIZE = 260000
+    MAX_TABLES = 10
+    tables = []
+    for i in range(0, actual_total, CHUNK_SIZE):
+        if len(tables) >= MAX_TABLES:
+            print(f"[CẢNH BÁO] Vượt quá {MAX_TABLES} bảng x {CHUNK_SIZE} = {MAX_TABLES*CHUNK_SIZE:,} block!")
+            print(f"           Các block từ vị trí {i} trở đi sẽ bị bỏ qua.")
+            break
+        tables.append(valid_blocks[i:i+CHUNK_SIZE])
 
-    def format_table(entries: list[BlockEntry], table_name: str) -> str:
-        lines = [f"local {table_name} = {{"]
+    num_tables = len(tables)
+    print(f"[INFO] Chia thành {num_tables} bảng dữ liệu (~{CHUNK_SIZE:,} block/bảng, tối đa 10 bảng)")
+
+    def format_table(entries, tname):
+        lines = [f"local {tname} = {{"]
         for b in entries:
             lines.append(f"  {{{b.x},{b.y},{b.z},{b.miniworld_id},{b.direction}}},")
         lines.append("}")
         return "\n".join(lines)
 
-    # Tạo dòng thống kê cho header
-    part_info = " | ".join(f"Phan {i+1}: {len(p)} khoi" for i, p in enumerate(parts))
-
     lua_header = (
-        f"-- Mini World Building Script (Auto Generated)\n"
+        f"-- Mini World Building Script (Auto Generated - Tick Based)\n"
         f"-- Kich thuoc: {meta.get('width',0)} x {meta.get('height',0)} x {meta.get('length',0)}"
-        f"  |  Tong khoi: {total}\n"
-        f"-- {part_info}\n"
-        f"-- Huong dan: Click vao block bat ky de dat moc, sau do go /build\n\n"
+        f"  |  Tong khoi: {actual_total}\n"
+        f"-- So bang du lieu: {num_tables} bang x ~{CHUNK_SIZE} khoi\n"
+        f"-- Lenh: /build | /pause | /resume | /stop | /progress | /speed N | /reset\n\n"
     )
 
-    # Sinh tất cả bảng dữ liệu
-    lua_data_parts = []
-    for i, part in enumerate(parts):
-        table_name = f"building_data_{i+1}"
-        lua_data_parts.append(format_table(part, table_name))
+    table_names = [f"_bd{i+1}" for i in range(num_tables)]
+    lua_tables = "\n\n".join(format_table(tables[i], table_names[i]) for i in range(num_tables))
 
-    # Sinh vòng lặp /build động theo số bảng thực tế
-    build_loops = ""
-    for i in range(num_tables):
-        tname = f"building_data_{i+1}"
-        build_loops += f"""        for i = 1, #{tname} do
-            local d = {tname}[i]
-            Block:setBlockAll(originX + d[1], originY + d[2], originZ + d[3], d[4], d[5])
-        end
-"""
+    # Sinh bảng meta: list tên các bảng để iterator dùng
+    table_list_lua = "local _all_tables = {" + ", ".join(table_names) + "}"
 
     lua_logic = f"""
-local originX, originY, originZ = nil, nil, nil
+{table_list_lua}
+local _tIdx   = 1   -- bảng hiện tại
+local _eIdx   = 1   -- entry trong bảng
+local _ox,_oy,_oz = nil,nil,nil
+local _paused = true
+local _done   = false
+local _ndone  = 0
+local _tick   = 0
+local _SPEED  = 200  -- block/tick (tăng nếu muốn nhanh hơn)
+local _ownerid = nil
 
-ScriptSupportEvent:registerEvent("Game.Start", function()
-    Chat:sendSystemMsg("#Y#b==================================")
-    Chat:sendSystemMsg("#Y#bHe thong san sang!")
-    Chat:sendSystemMsg("#Y#bHay CLICK vao block bat ky de dat moc.")
-    Chat:sendSystemMsg("#Y#bSau do go /build de xay dung.")
-    Chat:sendSystemMsg("#Y#bTong so khoi: {total} | So bang: {num_tables}")
-    Chat:sendSystemMsg("#Y#b-- Made by Lao Ky --")
-    Chat:sendSystemMsg("#Y#b==================================")
+-- Teleport người chơi theo tiến trình xây
+local function _tp(x,y,z)
+  if _ownerid then Player:setPosition(_ownerid, x, y+3, z) end
+end
+
+local function _showProgress()
+  local pct = math.floor(_ndone * 100 / {actual_total})
+  Chat:sendSystemMsg(string.format('[BUILD] %d/%d (%d%%) | bang %d/{num_tables} | tick %d',
+    _ndone, {actual_total}, pct, _tIdx, _tick))
+end
+
+-- ── TICK LOOP (Game.RunTime) ─────────────────────────────────
+ScriptSupportEvent:registerEvent('Game.RunTime', function()
+  if _paused or _done or _ox == nil then return end
+  _tick = _tick + 1
+  local processed = 0
+  while processed < _SPEED do
+    -- Lấy bảng hiện tại
+    local tbl = _all_tables[_tIdx]
+    if tbl == nil then
+      -- Hết tất cả bảng
+      _done = true
+      Chat:sendSystemMsg(string.format('[BUILD] Hoan tat! %d block | %d tick', _ndone, _tick))
+      return
+    end
+    if _eIdx > #tbl then
+      -- Sang bảng tiếp theo
+      _tIdx = _tIdx + 1
+      _eIdx = 1
+    else
+      local d = tbl[_eIdx]
+      Block:setBlockAll(_ox+d[1], _oy+d[2], _oz+d[3], d[4], d[5])
+      _eIdx   = _eIdx + 1
+      _ndone  = _ndone + 1
+      processed = processed + 1
+      if _ndone % 500  == 0 then _tp(_ox+d[1], _oy+d[2], _oz+d[3]) end
+      if _ndone % 5000 == 0 then _showProgress() end
+    end
+  end
 end)
 
-ScriptSupportEvent:registerEvent("Player.ClickBlock", function(e)
-    if originX == nil then
-        originX, originY, originZ = e.x, e.y, e.z
-        Block:setBlockAll(originX, originY, originZ, 1062, 0)
-        Chat:sendSystemMsg("#BDa dat moc tai: " .. originX .. "," .. originY .. "," .. originZ)
-        Chat:sendSystemMsg("#BGo lenh chat #R/build#B de khoi cong!")
+-- ── LỆNH CHAT ───────────────────────────────────────────────
+ScriptSupportEvent:registerEvent('Player.NewInputContent', function(e)
+  local msg = e.content or ''
+  if msg == '/build' then
+    if _ox == nil then
+      Chat:sendSystemMsg('[BUILD] Chua chon vi tri! Hay CLICK vao 1 block truoc.')
+      return
     end
+    if _done then
+      Chat:sendSystemMsg('[BUILD] Da xong! Go /reset roi click vi tri moi.')
+      return
+    end
+    _tIdx=1; _eIdx=1; _ndone=0; _tick=0; _done=false; _paused=false
+    Chat:sendSystemMsg(string.format('[BUILD] Bat dau! %d block | /pause de dung | /speed N de chinh toc do', {actual_total}))
+
+  elseif msg == '/pause' then
+    _paused = true
+    Chat:sendSystemMsg('[BUILD] Tam dung tai block ' .. _ndone .. '. /resume de tiep tuc.')
+
+  elseif msg == '/resume' then
+    if _ox == nil then Chat:sendSystemMsg('[BUILD] Chua co vi tri!') return end
+    _paused = false
+    Chat:sendSystemMsg('[BUILD] Tiep tuc...')
+
+  elseif msg == '/stop' then
+    _paused = true
+    _done   = true
+    Chat:sendSystemMsg('[BUILD] Dung! Da xay ' .. _ndone .. ' block.')
+
+  elseif msg == '/progress' then
+    _showProgress()
+
+  elseif msg == '/reset' then
+    _tIdx=1; _eIdx=1; _ndone=0; _tick=0
+    _paused=true; _done=false; _ox=nil; _oy=nil; _oz=nil
+    Chat:sendSystemMsg('[BUILD] Da reset. Hay CLICK block de chon vi tri moi.')
+
+  else
+    local n = msg:match('^/speed%s+(%d+)$')
+    if n then
+      _SPEED = math.max(10, math.min(tonumber(n), 2000))
+      Chat:sendSystemMsg('[BUILD] Toc do: ' .. _SPEED .. ' block/tick')
+    end
+  end
 end)
 
-ScriptSupportEvent:registerEvent("Player.NewInputContent", function(e)
-    if e.content == "/build" then
-        if originX == nil then
-            Chat:sendSystemMsg("#R#bLoi: Ban chua chon vi tri moc!")
-            return
-        end
-        Chat:sendSystemMsg("#bBat dau xay dung... ({total} khoi | {num_tables} bang)")
-{build_loops}        Chat:sendSystemMsg("#RHoan tat xay dung!")
-    end
-    if e.content == "/reset" then
-        originX, originY, originZ = nil, nil, nil
-        Chat:sendSystemMsg("#YDa reset moc. Hay click lai de chon vi tri moi.")
-    end
+-- ── CLICK BLOCK → CHỌN MỐC ──────────────────────────────────
+ScriptSupportEvent:registerEvent('Player.ClickBlock', function(e)
+  if _ox == nil then
+    _ox,_oy,_oz = e.x, e.y, e.z
+    Block:setBlockAll(_ox,_oy,_oz, 1062, 0)
+    Chat:sendSystemMsg('[BUILD] Moc tai: ' .. _ox..','.. _oy..','.. _oz)
+    Chat:sendSystemMsg('[BUILD] Go /build de bat dau xay ' .. {actual_total} .. ' block')
+  end
+end)
+
+-- ── NHẬN OWNERID ────────────────────────────────────────────
+ScriptSupportEvent:registerEvent('Game.AnyPlayer.EnterGame', function(e)
+  if _ownerid == nil then
+    _ownerid = e.eventobjid
+    Chat:sendSystemMsg('[BUILD] San sang! Click block de chon vi tri, roi go /build.')
+    Chat:sendSystemMsg('[BUILD] Tong: {actual_total} block | /speed N (mac dinh 200 block/tick)')
+  end
+end)
+
+ScriptSupportEvent:registerEvent('Game.Start', function()
+  Chat:sendSystemMsg('[BUILD] Script da load! Tong: {actual_total} block')
+  Chat:sendSystemMsg('[BUILD] Lenh: /build /pause /resume /stop /progress /speed N /reset')
 end)
 """
 
-    full_script = lua_header + "\n\n".join(lua_data_parts) + "\n" + lua_logic
+    full_script = lua_header + lua_tables + "\n\n" + lua_logic
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(full_script)
 
+    file_kb = os.path.getsize(output_path) / 1024
     print(f"[OK] Da luu Lua script: {output_path}")
-    print(f"     So bang du lieu: {num_tables}")
-    print(f"     Kich thuoc file: {os.path.getsize(output_path) / 1024:.1f} KB")
+    print(f"     Kich thuoc file: {file_kb:.1f} KB")
+    if file_kb > 5000:
+        print(f"[CANH BAO] File lon ({file_kb:.0f} KB) - Mini World co the khong load duoc het!")
+        print(f"           Goi y: Chia nho schematic truoc khi bien dich.")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  7. GIAO DIỆN NGƯỜI DÙNG (GUI / CLI)
+# ══════════════════════════════════════════════════════════════════════════════
 
 def run_conversion(input_path: str, output_path: str = None):
     """Thực hiện chuyển đổi từ file đầu vào."""
@@ -2101,8 +2090,8 @@ def run_conversion(input_path: str, output_path: str = None):
             blocks, meta = parse_litematic(input_path)
         elif ext == ".mcstructure":
             blocks, meta = parse_mcstructure(input_path)
-        elif ext == ".nbt":                                 
-            blocks, meta = parse_structure_nbt(input_path) 
+        elif ext == ".nbt":                                 # <--- THÊM DÒNG NÀY
+            blocks, meta = parse_structure_nbt(input_path)  # <--- THÊM DÒNG NÀY
         else:
             print(f"[CANH BAO] Phan mo rong khong ro '{ext}', thu tung parser...")
             parsed = False
@@ -2111,7 +2100,7 @@ def run_conversion(input_path: str, output_path: str = None):
                 (parse_litematic, ".litematic"),
                 (parse_schematic, ".schematic"),
                 (parse_mcstructure,".mcstructure"),
-                (parse_structure_nbt, ".nbt"),              
+                (parse_structure_nbt, ".nbt"),              # <--- THÊM VÀO FALLBACK
             ]:
                 try:
                     blocks, meta = parser_fn(input_path)
@@ -2140,135 +2129,18 @@ def run_conversion(input_path: str, output_path: str = None):
     generate_lua_script(blocks, meta, output_path)
     return output_path
 
-
-    def browse_input():
-        path = filedialog.askopenfilename(
-            title="Chọn file Minecraft Schematic / Structure",
-            filetypes=[
-                ("Minecraft structures", "*.schem *.schematic *.schm *.litematic *.mcstructure *.nbt"),
-                ("All files", "*.*")
-            ]
-        )
-        if path:
-            input_var.set(path)
-
-    tk.Button(entry_frame, text="Chọn", command=browse_input,
-              bg="#e94560", fg="white", font=("Consolas", 9, "bold"),
-              relief="flat", cursor="hand2", padx=10).pack(side="right", padx=(5, 0))
-
-    tk.Label(frame, text="File đầu ra:", font=("Consolas", 10, "bold"),
-             fg="#e0e0e0", bg="#16213e").pack(anchor="w", padx=10, pady=(10, 2))
-
-    output_var = tk.StringVar()
-    output_frame = tk.Frame(frame, bg="#16213e")
-    output_frame.pack(fill="x", padx=10, pady=(0, 10))
-
-    output_entry = tk.Entry(output_frame, textvariable=output_var, width=50,
-                            font=("Consolas", 9), bg="#0f3460", fg="#e0e0e0",
-                            insertbackground="white", relief="flat", bd=5)
-    output_entry.pack(side="left", fill="x", expand=True)
-
-    def browse_output():
-        path = filedialog.asksaveasfilename(
-            title="Lưu Lua Script",
-            defaultextension=".lua",
-            filetypes=[("Lua Script", "*.lua"), ("All files", "*.*")]
-        )
-        if path:
-            output_var.set(path)
-
-    tk.Button(output_frame, text="Lưu", command=browse_output,
-              bg="#533483", fg="white", font=("Consolas", 9, "bold"),
-              relief="flat", cursor="hand2", padx=10).pack(side="right", padx=(5, 0))
-
-    log_frame = tk.Frame(app, bg="#1a1a2e")
-    log_frame.pack(fill="both", expand=True, padx=30, pady=(0, 10))
-
-    log_text = tk.Text(log_frame, height=6, font=("Consolas", 9),
-                       bg="#0d0d1a", fg="#00ff88", insertbackground="white",
-                       relief="flat", bd=5, state="disabled")
-    log_text.pack(fill="both", expand=True)
-
-    def log(msg):
-        log_text.configure(state="normal")
-        log_text.insert("end", msg + "\n")
-        log_text.see("end")
-        log_text.configure(state="disabled")
-        app.update_idletasks()
-
-    class TextRedirector:
-        def __init__(self, widget): self.widget = widget
-        def write(self, msg):
-            if msg.strip(): log(msg.rstrip())
-        def flush(self): pass
-
-    sys.stdout = TextRedirector(log_text)
-
-    def do_convert():
-        inp = input_var.get().strip()
-        out = output_var.get().strip() or None
-        if not inp:
-            messagebox.showerror("Lỗi", "Hãy chọn file đầu vào!")
-            return
-        try:
-            result = run_conversion(inp, out)
-            if result:
-                messagebox.showinfo("Thành công", f" Chuyển đổi hoàn tất!\n\nFile đã lưu:\n{result}")
-            else:
-                messagebox.showwarning("Cảnh báo", "Không có khối nào được chuyển đổi.")
-        except Exception as e:
-            messagebox.showerror("Lỗi", f"Đã xảy ra lỗi:\n{e}")
-
-    tk.Button(app, text="CHUYỂN ĐỔI NGAY",
-              command=do_convert,
-              bg="#e94560", fg="white",
-              font=("Consolas", 12, "bold"),
-              relief="flat", cursor="hand2",
-              padx=20, pady=10).pack(pady=(0, 20))
-
-    def on_close():
-        sys.stdout = sys.__stdout__
-        root.destroy()
-
-    app.protocol("WM_DELETE_WINDOW", on_close)
-    root.mainloop()
-
-
-def inspect_nbt(file_path: str):
-    print(f"\n[INSPECT] Đang đọc cấu trúc NBT: {file_path}")
-    try:
-        nbt_file = nbtlib.load(file_path)
-        print("[INSPECT] Cấu trúc thẻ NBT (tối đa 5 cấp):")
-        print("─" * 60)
-        _dump_nbt_keys(nbt_file, max_depth=5)
-        print("─" * 60)
-        for key in ("Width", "Height", "Length", "Version", "DataVersion"):
-            val = deep_scan(nbt_file, key)
-            if val is not None:
-                print(f"  {key} = {int(val)}")
-        pal = deep_scan(nbt_file, "Palette")
-        if pal is not None:
-            print(f"  Palette: {len(pal)} loại block")
-            for i, (k, v) in enumerate(pal.items()):
-                if i >= 10:
-                    print(f"    ... và {len(pal)-10} loại khác")
-                    break
-                print(f"    [{int(v)}] {k}")
-    except Exception as e:
-        print(f"[LỖI] Không thể đọc file: {e}")
-        traceback.print_exc()
-
-
-
+# ── HÀM XỬ LÝ FILE TỪ TRÌNH DUYỆT ──────────────────────────
 async def process_file(event):
-    document.getElementById("log-output").value = "" # Xóa log cũ
+    document.getElementById("log-output").value = ""
     document.getElementById("download-link").style.display = "none"
-    
+    document.getElementById("loading-msg").innerText = "⏳ Đang xử lý..."
+
     file_input = document.getElementById("file-upload")
     if file_input.files.length == 0:
         print("[LỖI] Bạn chưa chọn file nào!")
+        document.getElementById("loading-msg").innerText = ""
         return
-        
+
     file = file_input.files.item(0)
     print(f"[INFO] Đã nạp file: {file.name}")
     print(f"[INFO] Đang chuyển dữ liệu vào hệ thống ảo...")
@@ -2276,33 +2148,37 @@ async def process_file(event):
     try:
         array_buffer = await file.arrayBuffer()
         file_bytes = Uint8Array.new(array_buffer).to_py()
-        
+
         virtual_input_path = file.name
         with open(virtual_input_path, "wb") as f:
             f.write(bytes(file_bytes))
-            
+
         virtual_output_path = "output_script.lua"
-        
+
         print("-" * 50)
         result_path = run_conversion(virtual_input_path, virtual_output_path)
         print("-" * 50)
-        
+
         if result_path:
             with open(result_path, "r", encoding="utf-8") as f:
                 lua_content = f.read()
-            
+
             blob = Blob.new([lua_content], type="text/plain")
             url = URL.createObjectURL(blob)
-            
-            download_link = document.getElementById("download-link")
-            download_link.href = url
-            download_link.download = file.name.split('.')[0] + "_miniworld.lua"
-            download_link.style.display = "inline-block"
-            print(f"[THÀNH CÔNG] File Lua đã sẵn sàng! Nhấn nút tải xuống bên dưới.")
-            
+
+            dl = document.getElementById("download-link")
+            dl.href = url
+            dl.download = file.name.rsplit(".", 1)[0] + "_miniworld.lua"
+            dl.style.display = "inline-block"
+            print(f"[THÀNH CÔNG] File Lua đã sẵn sàng! Nhấn nút tải xuống.")
+        else:
+            print("[CẢNH BÁO] Không có khối nào được xuất.")
+
     except Exception as e:
-        print(f"\\n[LỖI NGHIÊM TRỌNG] Quá trình thất bại:")
+        print(f"\n[LỖI NGHIÊM TRỌNG] Quá trình thất bại:")
         traceback.print_exc()
+    finally:
+        document.getElementById("loading-msg").innerText = ""
     </script>
 </body>
 </html>
