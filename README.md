@@ -4,7 +4,7 @@
 
 ## Bản Demo trực tuyến
 Bạn có thể truy cập và sử dụng công cụ ngay tại đây:
-[https://laoky.github.io/Mini-World-Building-Tool/](https://laoky.github.io/Mini-World-Building-Tool/)
+[https://laoky.github.io/MiniWorld-BuildingTool/](https://laoky.github.io/MiniWorld-BuildingTool/)
 
 ---
 
